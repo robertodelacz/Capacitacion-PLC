@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <link rel="icon" type="image/png"
+        href="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png">
+  <link rel="shortcut icon" type="image/png"
+        href="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png">
+  <link rel="apple-touch-icon"
+        href="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png">
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
+
+<!-- ================= SPLASH ================= -->
+<div id="splash">
+  <div class="sp">
+    <div class="sp-placa">
+      <img class="sp-logo" src="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png"
+           alt="Financiera Cualli" onerror="this.style.display='none'">
+    </div>
+    <div class="sp-regla"></div>
+    <div class="sp-sis">Capacitación PLD-FT</div>
+    <div class="sp-bien">
+      <div class="sp-hola">Bienvenido</div>
+      <div class="sp-nom" id="spNom"></div>
+      <div class="sp-rol" id="spRol"></div>
+    </div>
+    <svg class="sp-aro" viewBox="0 0 26 26">
+      <circle class="p" cx="13" cy="13" r="10.5"/>
+      <circle class="a" cx="13" cy="13" r="10.5"/>
+    </svg>
+  </div>
+</div>
+
+<!-- ================= RIEL ================= -->
+<aside class="riel">
+  <div class="riel-m">
+    <div class="riel-placa">
+      <img src="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png"
+           alt="Financiera Cualli" onerror="this.style.display='none'">
+    </div>
+    <div class="riel-s"><b>Capacitación PLD-FT</b>Financiera Cualli</div>
+  </div>
+
+  <nav class="riel-n">
+    <div class="riel-e">Examen</div>
+    <div id="rielInfo" style="padding:6px 18px;color:rgba(255,255,255,.55);font-size:12.5px;line-height:1.7"></div>
+  </nav>
+
+  <div class="riel-p">
+    <div class="riel-u">
+      <div class="avatar" id="avatar">—</div>
+      <div><div class="ru-n" id="ruNom">—</div><div class="ru-r" id="ruRol"></div></div>
+    </div>
+    <div class="riel-v" id="vigencia">
+      <span class="foco verde" id="foco"></span>
+      <span id="vigTxt">Cargando…</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ================= OBRA ================= -->
+<div class="obra">
+  <div class="cinta">
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+    <span><b>Confidencial</b> Tu avance y calificación son visibles únicamente para ti y el Oficial de Cumplimiento.</span>
+  </div>
+
+  <main class="tela">
+    <section class="vista viva" id="vApp">
+      <div id="app" aria-live="polite" aria-atomic="false">
+        <div class="cargando">
+          <svg class="aro" viewBox="0 0 36 36"><circle class="p" cx="18" cy="18" r="15.5"/><circle class="a" cx="18" cy="18" r="15.5"/></svg>
+          <div class="cargando-t">Verificando tu acceso</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<?!= include('JavaScript'); ?>
+</body>
+</html>

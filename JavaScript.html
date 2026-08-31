@@ -1,0 +1,511 @@
+<script>
+  let datosSeleccion = null;
+  let preguntaActualId = null;
+  let opcionSeleccionada = null;
+  let segundosLocal = 0;
+  let temporizadorTick = null;
+  let temporizadorSync = null;
+  let examenEnCurso = false;
+  let cambiosFoco = 0;
+  const inicioCarga = Date.now();
+  const ESPERA_MIN_SPLASH = 900;
+
+  // Anti-fraude ligero: se registra (no se bloquea) cada vez que la persona
+  // sale de la pestaña mientras el examen está activo. Queda en el historial
+  // del intento para que el oficial de cumplimiento lo revise si lo necesita.
+  document.addEventListener('visibilitychange', () => {
+    if (examenEnCurso && document.hidden) {
+      cambiosFoco++;
+      mostrarAviso('Se detectó que saliste de esta pestaña. Este evento queda registrado.');
+    }
+  });
+
+  // Fricción básica contra copiar el contenido del examen — no impide a
+  // alguien decidido, pero desalienta compartirlo por copiar/pegar casual.
+  document.addEventListener('contextmenu', (e) => { if (examenEnCurso) e.preventDefault(); });
+  document.addEventListener('copy', (e) => { if (examenEnCurso) e.preventDefault(); });
+  document.addEventListener('cut', (e) => { if (examenEnCurso) e.preventDefault(); });
+
+  function mostrarAviso(texto) {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.setAttribute('role', 'status');
+    toast.innerHTML = `<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19L12 3z"/><path d="M12 10v4"/><path d="M12 17.4v.6"/></svg><span>${texto}</span>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Dispersión: si mucha gente abre el enlace en el mismo instante (justo
+    // al terminar la capacitación), esto reparte esas peticiones en una
+    // ventana de ~2.5s en vez de mandarlas todas en el mismo milisegundo.
+    const espera = Math.random() * 2500;
+    setTimeout(() => llamarServidor('iniciar', [], alTerminarCarga), espera);
+  });
+
+  /**
+   * Envoltura para google.script.run con recuperación automática: si el
+   * servidor no responde en el tiempo esperado (puede pasar aunque la
+   * operación sí se haya completado del lado del servidor — es la
+   * comunicación de regreso la que a veces falla), se vuelve a consultar
+   * iniciar() para reencontrar el estado real en vez de dejar a la persona
+   * viendo un spinner para siempre.
+   */
+  function llamarServidor(nombreFuncion, args, exito, timeoutMs) {
+    let resuelto = false;
+    const recuperar = setTimeout(() => {
+      if (resuelto) return;
+      resuelto = true;
+      google.script.run.withSuccessHandler(renderizar).withFailureHandler(mostrarError).iniciar();
+    }, timeoutMs || 12000);
+
+    const runner = google.script.run
+      .withSuccessHandler((r) => { if (resuelto) return; resuelto = true; clearTimeout(recuperar); exito(r); })
+      .withFailureHandler((e) => { if (resuelto) return; resuelto = true; clearTimeout(recuperar); mostrarError(e); });
+    runner[nombreFuncion].apply(runner, args || []);
+  }
+
+  function alTerminarCarga(datos) {
+    const faltante = ESPERA_MIN_SPLASH - (Date.now() - inicioCarga);
+    setTimeout(() => {
+      document.getElementById('splash').classList.add('fuera');
+      renderizar(datos);
+    }, Math.max(0, faltante));
+  }
+
+  function iniciales(nombre) {
+    if (!nombre) return '—';
+    const partes = nombre.trim().split(/\s+/);
+    return ((partes[0] || '')[0] || '') + ((partes[1] || '')[0] || '');
+  }
+
+  function actualizarIdentidad(nombre, puesto) {
+    document.getElementById('spNom').textContent = nombre || '';
+    document.getElementById('spRol').textContent = puesto || '';
+    document.getElementById('avatar').textContent = iniciales(nombre);
+    document.getElementById('ruNom').textContent = nombre || '—';
+    document.getElementById('ruRol').textContent = puesto || '';
+  }
+
+  function actualizarVigencia(foco, texto) {
+    document.getElementById('foco').className = 'foco ' + foco;
+    document.getElementById('vigTxt').innerHTML = texto;
+  }
+
+  function actualizarRielInfo(html) {
+    document.getElementById('rielInfo').innerHTML = html;
+  }
+
+  function pantallaCargando(mensaje) {
+    return `
+      <div class="cargando">
+        <svg class="aro" viewBox="0 0 36 36" aria-hidden="true"><circle class="p" cx="18" cy="18" r="15.5"/><circle class="a" cx="18" cy="18" r="15.5"/></svg>
+        <div class="cargando-t">${mensaje}</div>
+      </div>`;
+  }
+
+  function mostrarError(error) {
+    const mensaje = (error && error.message) || String(error);
+    const esSaturacion = /simult|too many|quota|demasiad/i.test(mensaje);
+
+    if (esSaturacion) {
+      // Con toda la organización presentando a la vez, es normal tocar
+      // momentáneamente el límite de ejecuciones simultáneas de Apps Script.
+      // Tu progreso ya vive en el servidor — no se pierde nada. Reintenta solo.
+      detenerTemporizador();
+      document.getElementById('app').innerHTML = pantallaCargando('Hay mucha actividad en este momento, reintentando…');
+      setTimeout(() => { llamarServidor('iniciar', [], renderizar); }, 3500);
+      return;
+    }
+
+    detenerTemporizador();
+    document.getElementById('app').innerHTML = `
+      <div class="vacio">
+        <svg class="vacio-i" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3l9.5 17h-19L12 3z"/><path d="M12 10v4"/><path d="M12 17.4v.6"/></svg>
+        <div class="vacio-t">No se pudo continuar</div>
+        <p class="vacio-p">${mensaje}</p>
+      </div>`;
+  }
+
+  function renderizar(datos) {
+    document.getElementById('splash').classList.add('fuera');
+
+    if (datos.pantalla === 'EXAMEN_EN_CURSO') {
+      actualizarIdentidad(datos.nombre, datos.puesto);
+      renderPregunta(datos.pregunta, datos.progreso, datos.segundosRestantes);
+      iniciarTemporizador(datos.segundosRestantes);
+      return;
+    }
+    const pantallas = {
+      NO_AUTORIZADO: pantallaNoAutorizado,
+      FUERA_DE_VENTANA: pantallaFueraDeVentana,
+      APROBADO: pantallaAprobado,
+      BLOQUEADO: pantallaBloqueado,
+      SELECCION_EXAMEN: pantallaSeleccion
+    };
+    const render = pantallas[datos.pantalla];
+    document.getElementById('app').innerHTML = render
+      ? render(datos)
+      : `<div class="vacio"><div class="vacio-t">Estado no reconocido</div></div>`;
+  }
+
+  function iconoCandado() {
+    return `<svg class="vacio-i" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>`;
+  }
+
+  function pantallaNoAutorizado() {
+    actualizarRielInfo('Acceso restringido');
+    actualizarVigencia('rojo', 'No autorizado');
+    return `
+      <div class="vacio">
+        ${iconoCandado()}
+        <div class="vacio-t">Este correo no está en el roster de colaboradores</div>
+        <p class="vacio-p">Si crees que esto es un error, contacta al oficial de cumplimiento para que verifique tu registro.</p>
+      </div>`;
+  }
+
+  function pantallaFueraDeVentana(d) {
+    actualizarRielInfo('Campaña cerrada');
+    actualizarVigencia('ambar', `Del ${d.ventanaInicioTexto}<br>al ${d.ventanaFinTexto}`);
+    return `
+      <div class="vacio">
+        <svg class="vacio-i" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+        <div class="vacio-t">La ventana de esta capacitación no está abierta</div>
+        <p class="vacio-p">Disponible del ${d.ventanaInicioTexto} al ${d.ventanaFinTexto}.</p>
+      </div>`;
+  }
+
+  function pantallaAprobado(d) {
+    actualizarIdentidad(d.nombre, '');
+    actualizarRielInfo('Ya presentaste tu examen');
+    actualizarVigencia('verde', 'Aprobado');
+    return `
+      <div class="panel">
+        <div class="panel-h">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+          <h2>Resultado</h2>
+        </div>
+        <div class="panel-b">
+          <span class="estatus libre">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            Aprobado
+          </span>
+          <p style="margin-top:16px;color:var(--g500)">Calificación obtenida: ${d.calificacion}. El acceso a un nuevo examen está bloqueado para esta campaña.</p>
+          <div style="margin-top:22px;display:flex;gap:12px;flex-wrap:wrap">
+            <button class="btn btn-pri" onclick="descargarConstanciaExistente()">Descargar constancia</button>
+            <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function pantallaBloqueado(d) {
+    actualizarRielInfo('Sin intentos disponibles');
+    actualizarVigencia('rojo', 'Bloqueado');
+    return `
+      <div class="vacio">
+        ${iconoCandado()}
+        <div class="vacio-t">Alcanzaste el máximo de intentos permitidos</div>
+        <p class="vacio-p">Contacta al oficial de cumplimiento para resolver tu situación: <strong>${d.correoOficial}</strong></p>
+      </div>`;
+  }
+
+  function pantallaSeleccion(d) {
+    datosSeleccion = d;
+    actualizarIdentidad(d.nombre, d.puesto);
+    actualizarRielInfo('Examen disponible');
+    actualizarVigencia('verde', `${d.intentosRestantes} intento(s) disponibles`);
+    return `
+      <header class="cabecera panel-cab">
+        <div class="cab-txt">
+          <div class="cab-ante"><span class="cab-rombo"></span>Prevención de Lavado de Dinero y Financiamiento al Terrorismo</div>
+          <h1>Capacitación Anual<br>PLD/FT</h1>
+          <span class="cab-hilo"></span>
+          <p>Examen de opción múltiple. Las preguntas se presentan una a la vez y, una vez
+             que inicies, el reloj de ${d.duracionMinutos} minutos no se detiene.</p>
+        </div>
+        <div class="cab-der">
+          <div class="cab-estado">
+            <span class="cab-foco verde"></span>
+            <div><div class="cab-k">Intentos disponibles</div><div class="cab-v">${d.intentosRestantes}</div></div>
+          </div>
+        </div>
+      </header>
+
+      <div class="fichas">
+        <div class="ficha viva"><div class="ficha-n">${d.numPreguntas}</div><div class="ficha-k">Preguntas</div></div>
+        <div class="ficha viva"><div class="ficha-n">${d.duracionMinutos}</div><div class="ficha-k">Minutos</div></div>
+        <div class="ficha viva"><div class="ficha-n">${d.puntajeMinimo}</div><div class="ficha-k">Mínimo para aprobar</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-b" style="text-align:center">
+          <button class="btn btn-pri" onclick="mostrarConfirmacionIdentidad()">Seleccionar este examen</button>
+        </div>
+      </div>`;
+  }
+
+  function mostrarConfirmacionIdentidad() {
+    const d = datosSeleccion;
+    actualizarRielInfo('Confirmando identidad');
+    document.getElementById('app').innerHTML = `
+      <div class="panel">
+        <div class="panel-h">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg>
+          <h2>Confirma tus datos</h2>
+        </div>
+        <div class="panel-b">
+          <div class="cuadro">
+            <div class="cel"><div class="cel-k">Nombre completo</div><div class="cel-v">${d.nombre}</div></div>
+            <div class="cel"><div class="cel-k">Puesto</div><div class="cel-v">${d.puesto}</div></div>
+          </div>
+          <p class="campo-ayuda">Estos datos son los que aparecerán en tu constancia si apruebas.
+             Una vez que inicies, el reloj de ${d.duracionMinutos} minutos no se detiene.</p>
+          <div style="display:flex;gap:12px;margin-top:22px;flex-wrap:wrap">
+            <button class="btn btn-pri" onclick="confirmarIdentidad()">Sí, son correctos — comenzar</button>
+            <button class="btn btn-borde" onclick="reportarDatoIncorrecto()">Mis datos están mal</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function reportarDatoIncorrecto() {
+    alert('Contacta al oficial de cumplimiento para corregir tu registro antes de presentar el examen.');
+  }
+
+  function confirmarIdentidad() {
+    document.getElementById('app').innerHTML = pantallaCargando('Preparando tu examen');
+    // Este es el momento más sincronizado de todos: mucha gente confirmando
+    // "sí, soy yo" casi al mismo tiempo tras la capacitación. Se dispersa
+    // igual que la carga inicial.
+    const espera = Math.random() * 3000;
+    setTimeout(() => { llamarServidor('confirmarIdentidadEIniciar', [], iniciarExamenConSesion); }, espera);
+  }
+
+  function iniciarExamenConSesion(r) {
+    renderPregunta(r.pregunta, r.progreso, r.segundosRestantes);
+    iniciarTemporizador(r.segundosRestantes);
+  }
+
+  function renderPregunta(pregunta, progreso, segundosIniciales) {
+    preguntaActualId = pregunta.id;
+    opcionSeleccionada = null;
+    examenEnCurso = true;
+    const pctPrevio = ((progreso.actual - 1) / progreso.total) * 100;
+    actualizarRielInfo(`Pregunta ${progreso.actual} de ${progreso.total}`);
+    document.getElementById('app').innerHTML = `
+      <div class="panel panel-entra">
+        <div class="panel-h">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.4v.6"/></svg>
+          <h2>${pregunta.tema}</h2>
+          <span class="panel-n">Pregunta ${progreso.actual} de ${progreso.total}</span>
+          <span class="reloj-ex mono" id="relojEx">--:--</span>
+        </div>
+        <div class="panel-b">
+          <div class="barra-ex"><div class="barra-ex__r" style="width:${pctPrevio}%"></div></div>
+          <p class="pregunta-ex">${pregunta.pregunta}</p>
+          <fieldset style="border:0;padding:0;margin:0">
+            <legend class="sr-only">Opciones de respuesta, elige una</legend>
+            <div id="opciones">
+              ${Object.entries(pregunta.opciones).map(([letra, texto]) => `
+                <label class="opcion-ex" data-letra="${letra}">
+                  <input type="radio" name="opcion" value="${letra}" onchange="marcarOpcion('${letra}')">
+                  <span>${texto}</span>
+                </label>`).join('')}
+            </div>
+          </fieldset>
+          <button class="btn btn-pri" id="btnSiguiente" disabled onclick="enviarRespuestaActual()">
+            ${progreso.actual === progreso.total ? 'Finalizar examen' : 'Siguiente'}
+          </button>
+        </div>
+      </div>`;
+    actualizarRelojUI();
+  }
+
+  function marcarOpcion(letra) {
+    opcionSeleccionada = letra;
+    document.querySelectorAll('.opcion-ex').forEach(el => {
+      el.classList.toggle('elegida', el.dataset.letra === letra);
+    });
+    document.getElementById('btnSiguiente').disabled = false;
+  }
+
+  function enviarRespuestaActual() {
+    if (!opcionSeleccionada) return;
+    document.getElementById('btnSiguiente').disabled = true;
+    const id = preguntaActualId;
+    const opcion = opcionSeleccionada;
+    llamarServidor('responderPreguntaActual', [id, opcion, cambiosFoco], manejarAvance);
+  }
+
+  function manejarAvance(r) {
+    if (r.terminado) {
+      examenEnCurso = false;
+      detenerTemporizador();
+      mostrarResultado(r);
+    } else {
+      renderPregunta(r.pregunta, r.progreso, r.segundosRestantes);
+      segundosLocal = r.segundosRestantes;
+    }
+  }
+
+  function iniciarTemporizador(segundosIniciales) {
+    detenerTemporizador();
+    segundosLocal = segundosIniciales;
+    actualizarRelojUI();
+    temporizadorTick = setInterval(() => {
+      segundosLocal = Math.max(0, segundosLocal - 1);
+      actualizarRelojUI();
+      if (segundosLocal <= 0) {
+        detenerTemporizador();
+        verificarTiempoServidor();
+      }
+    }, 1000);
+    temporizadorSync = setInterval(verificarTiempoServidor, 20000);
+  }
+
+  function detenerTemporizador() {
+    clearInterval(temporizadorTick);
+    clearInterval(temporizadorSync);
+  }
+
+  function verificarTiempoServidor() {
+    google.script.run.withSuccessHandler(manejarVerificacion).withFailureHandler(mostrarError).verificarSesion();
+  }
+
+  function manejarVerificacion(r) {
+    if (!r.sesionActiva) {
+      examenEnCurso = false;
+      detenerTemporizador();
+      mostrarResultado(r);
+    } else {
+      segundosLocal = r.segundosRestantes;
+    }
+  }
+
+  function actualizarRelojUI() {
+    const mm = Math.floor(segundosLocal / 60).toString().padStart(2, '0');
+    const ss = (segundosLocal % 60).toString().padStart(2, '0');
+    const alerta = segundosLocal <= 300;
+    const foco = alerta ? 'rojo' : 'verde';
+    actualizarVigencia(foco, `Tiempo restante<b>${mm}:${ss}</b>`);
+    const relojEx = document.getElementById('relojEx');
+    if (relojEx) {
+      relojEx.textContent = `${mm}:${ss}`;
+      relojEx.classList.toggle('alerta', alerta);
+    }
+  }
+
+  function mostrarResultado(r) {
+    const notaTiempo = r.seAgotoElTiempo ? '<p style="margin-top:10px;color:var(--g500);font-style:italic">Se acabó el tiempo antes de terminar el examen.</p>' : '';
+
+    if (r.aprobado && r.constanciaPendiente) {
+      actualizarRielInfo('Aprobado — constancia pendiente');
+      actualizarVigencia('ambar', 'Constancia pendiente');
+      document.getElementById('app').innerHTML = `
+        <div class="panel">
+          <div class="panel-b">
+            <span class="estatus libre">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+              Aprobado
+            </span>
+            <p style="margin-top:16px;color:var(--g500)">${r.aciertos} de ${r.total} correctas. Tu resultado ya quedó registrado, pero la constancia no se pudo generar en automático. Contacta al oficial de cumplimiento o intenta descargarla más tarde.</p>
+            <div style="margin-top:22px"><button class="btn btn-pri" onclick="descargarConstanciaExistente()">Reintentar descarga</button></div>
+          </div>
+        </div>`;
+    } else if (r.aprobado) {
+      actualizarRielInfo('Examen aprobado');
+      actualizarVigencia('verde', 'Aprobado');
+      document.getElementById('app').innerHTML = `
+        <div class="panel">
+          <div class="panel-b">
+            <span class="estatus libre">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+              Aprobado
+            </span>
+            <p style="margin-top:16px;color:var(--g500)">${r.aciertos} de ${r.total} correctas · Folio ${r.folio}</p>
+            <div style="margin-top:22px;display:flex;gap:12px;flex-wrap:wrap">
+              <button class="btn btn-pri" onclick="descargarPdf('${r.pdfBase64}', '${r.folio}')">Descargar constancia</button>
+              <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
+            </div>
+          </div>
+        </div>`;
+    } else if (r.bloqueado) {
+      actualizarRielInfo('Intentos agotados');
+      actualizarVigencia('rojo', 'Bloqueado');
+      document.getElementById('app').innerHTML = `
+        <div class="panel">
+          <div class="panel-b">
+            <span class="estatus">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+              No aprobado · intentos agotados
+            </span>
+            <p style="margin-top:16px;color:var(--g500)">${r.aciertos} de ${r.total} correctas.</p>
+            ${notaTiempo}
+            <p style="margin-top:10px;color:var(--g500)">Contacta al oficial de cumplimiento: <strong>${r.correoOficial}</strong></p>
+          </div>
+        </div>`;
+    } else {
+      actualizarRielInfo('No aprobado');
+      actualizarVigencia('ambar', `${r.intentosRestantes} intento(s) restantes`);
+      document.getElementById('app').innerHTML = `
+        <div class="panel">
+          <div class="panel-b">
+            <span class="estatus">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+              No aprobado
+            </span>
+            <p style="margin-top:16px;color:var(--g500)">${r.aciertos} de ${r.total} correctas.</p>
+            ${notaTiempo}
+            <p style="margin-top:10px;color:var(--g500)">Te quedan ${r.intentosRestantes} intento(s).</p>
+            <div style="margin-top:22px"><button class="btn btn-pri" onclick="intentarDeNuevo()">Intentar de nuevo</button></div>
+          </div>
+        </div>`;
+    }
+  }
+
+  function intentarDeNuevo() {
+    document.getElementById('app').innerHTML = pantallaCargando('Cargando…');
+    llamarServidor('iniciar', [], renderizar);
+  }
+
+  function finalizarSesionUsuario() {
+    detenerTemporizador();
+    actualizarRielInfo('Sesión finalizada');
+    actualizarVigencia('verde', 'Finalizado');
+    document.getElementById('app').innerHTML = `
+      <div class="vacio">
+        <svg class="vacio-i" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <div class="vacio-t">Listo, ya terminaste</div>
+        <p class="vacio-p">Tu constancia quedó descargada. Ya puedes cerrar esta pestaña.</p>
+      </div>`;
+    setTimeout(() => { try { window.close(); } catch (e) {} }, 500);
+  }
+
+  function descargarConstanciaExistente() {
+    google.script.run
+      .withSuccessHandler(r => descargarPdf(r.pdfBase64, r.folio))
+      .withFailureHandler(mostrarError)
+      .descargarConstanciaPropia();
+  }
+
+  function descargarPdf(base64, folio) {
+    const bytes = atob(base64);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    const blob = new Blob([arr], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Constancia_${folio}.pdf`;
+    a.click();
+  }
+</script>
