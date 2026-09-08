@@ -7,7 +7,7 @@
  */
 
 function doGet() {
-  return HtmlService.createTemplateFromFile('Index')
+  return HtmlService.createTemplateFromFile('Interfaz')
     .evaluate()
     .setTitle('Capacitación PLD-FT · Financiera Cualli')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -35,7 +35,7 @@ function iniciar() {
     };
   }
   if (estado.estado === 'APROBADO') {
-    return { pantalla: 'APROBADO', nombre: usuario.nombre, calificacion: estado.mejorCalificacion };
+    return { pantalla: 'APROBADO', nombre: usuario.nombre, calificacion: estado.mejorCalificacion, total: config.numPreguntasExamen };
   }
   if (estado.estado === 'BLOQUEADO_INTENTOS') {
     return { pantalla: 'BLOQUEADO', correoOficial: config.correoOficialCumplimiento };
@@ -49,7 +49,7 @@ function iniciar() {
       finalizarSesion(usuario, sesion.preguntaIds, sesion.respuestas, config);
       return iniciar(); // ya se consumió el intento por tiempo; reevalúa el estado
     }
-    const preguntaActual = obtenerPreguntaPorId(sesion.preguntaIds[sesion.indiceActual]);
+    const preguntaActual = obtenerPreguntaPorId(sesion.preguntaIds[sesion.indiceActual], usuario.correo);
     return {
       pantalla: 'EXAMEN_EN_CURSO',
       nombre: usuario.nombre,
@@ -65,6 +65,7 @@ function iniciar() {
     nombre: usuario.nombre,
     puesto: usuario.puesto,
     intentosRestantes: estado.intentosRestantes,
+    maxIntentos: config.maxIntentos,
     numPreguntas: config.numPreguntasExamen,
     duracionMinutos: config.duracionExamenMinutos,
     puntajeMinimo: config.puntajeMinimo
@@ -86,7 +87,7 @@ function confirmarIdentidadEIniciar() {
   crearSesion(usuario.correo, estado.config.campanaId, ids);
 
   return {
-    pregunta: obtenerPreguntaPorId(ids[0]),
+    pregunta: obtenerPreguntaPorId(ids[0], usuario.correo),
     progreso: { actual: 1, total: ids.length },
     segundosRestantes: estado.config.duracionExamenMinutos * 60
   };
@@ -121,7 +122,7 @@ function responderPreguntaActual(preguntaId, opcionElegida, cambiosFoco) {
   actualizarSesion(usuario.correo, config.campanaId, sesion.respuestas, siguienteIndice, cambiosFoco);
   return {
     terminado: false,
-    pregunta: obtenerPreguntaPorId(sesion.preguntaIds[siguienteIndice]),
+    pregunta: obtenerPreguntaPorId(sesion.preguntaIds[siguienteIndice], usuario.correo),
     progreso: { actual: siguienteIndice + 1, total: sesion.preguntaIds.length },
     segundosRestantes: segundosRestantes(sesion, config.duracionExamenMinutos)
   };
@@ -147,7 +148,7 @@ function verificarSesion() {
 /** Califica, registra el intento, cierra la sesión y genera la constancia si aplica. Se usa tanto al terminar normal como al agotarse el tiempo. */
 function finalizarSesion(usuario, preguntaIds, respuestasObj, config, cambiosFoco) {
   const respuestas = preguntaIds.map(id => ({ id, opcionElegida: respuestasObj[id] || null }));
-  const resultado = calificarExamen(respuestas);
+  const resultado = calificarExamen(respuestas, usuario.correo);
   const aprobado = resultado.aciertos >= config.puntajeMinimo;
 
   const numIntento = registrarIntento(usuario.correo, preguntaIds, respuestas, resultado.aciertos, aprobado, cambiosFoco || 0);
