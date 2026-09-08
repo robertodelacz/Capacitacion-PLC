@@ -129,6 +129,10 @@ svg{display:block}
 .riel-s b{display:block;color:#fff;font-size:13px;letter-spacing:.12em;font-weight:700;margin-bottom:5px}
 
 .riel-n{padding:6px 14px;flex:1;overflow-y:auto}
+.riel-stat{padding:11px 4px;border-bottom:1px solid rgba(255,255,255,.06)}
+.riel-stat__k{display:block;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(255,255,255,.38)}
+.riel-stat__v{display:block;font-size:13.5px;font-weight:600;color:#fff;margin-top:4px}
 .riel-e{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.26em;
   text-transform:uppercase;color:rgba(255,255,255,.28);padding:16px 14px 11px;font-weight:600}
 .nav-b{width:100%;background:none;border:0;cursor:pointer;text-align:left;position:relative;
@@ -195,7 +199,8 @@ svg{display:block}
   hyphens:none;-webkit-hyphens:none;-ms-hyphens:none;
   word-break:normal;overflow-wrap:break-word}
 .cabecera.panel-cab{background:var(--blanco);border-radius:var(--r-l);box-shadow:var(--s2);
-  padding:38px 40px;align-items:center;overflow:hidden;position:relative;padding-bottom:38px}
+  padding:38px 40px;align-items:center;overflow:hidden;position:relative;padding-bottom:38px;
+  animation:sube .4s cubic-bezier(.2,.7,.3,1) both}
 .cabecera.panel-cab::after{left:0;right:auto;top:0;bottom:auto;width:130px;height:4px;
   background:var(--oro);border-radius:0 0 4px 0}
 .cabecera.panel-cab h1{font-size:38px;letter-spacing:-.036em;line-height:1.06;margin-bottom:14px}
@@ -204,6 +209,7 @@ svg{display:block}
 .cabecera.panel-cab p{font-size:15.5px;max-width:540px}
 .cab-der{display:flex;flex-direction:column;align-items:flex-end;gap:18px;flex-shrink:0}
 .cab-fig{width:180px;height:180px;flex-shrink:0}
+.cab-fig--pop{animation:insigniaPop .6s .2s cubic-bezier(.2,1.4,.4,1) both}
 .cab-fig svg{width:100%;height:100%}
 .cab-fig img{width:100%;height:auto;display:block;border-radius:var(--r-m)}
 .cab-estado{display:flex;align-items:center;gap:15px;padding:15px 20px;flex-shrink:0;
@@ -239,6 +245,29 @@ svg{display:block}
 .cargando-t{font-size:10px;color:var(--g400);letter-spacing:.26em;text-transform:uppercase;
   font-weight:700;animation:resp 1.5s ease-in-out infinite}
 @keyframes resp{0%,100%{opacity:.4}50%{opacity:1}}
+
+/* Pantalla dedicada al terminar la última pregunta — más presencia que el
+   spinner genérico, con una frase que va cambiando para que la espera
+   (mientras se califica y, si aplica, se genera el PDF) se sienta activa. */
+.evaluando{margin-top:22px;background:var(--blanco);border-radius:var(--r-l);
+  box-shadow:var(--s2);text-align:center;padding:70px 24px;
+  animation:sube .4s cubic-bezier(.2,.7,.3,1) both}
+.evaluando__aro{position:relative;width:76px;height:76px;margin:0 auto 30px}
+.evaluando__aro svg:first-child{width:76px;height:76px}
+.evaluando__pista{fill:none;stroke:var(--g150);stroke-width:4}
+.evaluando__giro{fill:none;stroke:var(--oro);stroke-width:4;stroke-linecap:round;
+  stroke-dasharray:60 110;transform-origin:32px 32px;animation:gira 1.2s linear infinite}
+.evaluando__check{position:absolute;top:50%;left:50%;width:26px;height:26px;
+  transform:translate(-50%,-50%);stroke:var(--verde);stroke-width:3;fill:none;
+  opacity:0;animation:checkPulso 2.4s ease-in-out infinite}
+@keyframes checkPulso{
+  0%,40%{opacity:0;transform:translate(-50%,-50%) scale(.7)}
+  55%,80%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(.7)}
+}
+.evaluando__titulo{font-size:19px;font-weight:700;color:var(--g900);letter-spacing:-.01em}
+.evaluando__frase{margin-top:10px;font-size:13.5px;color:var(--g500);
+  transition:opacity .2s ease;min-height:18px}
 
 /* ================= PANELES ================= */
 .panel{background:var(--blanco);border-radius:var(--r-l);box-shadow:var(--s2);overflow:hidden}
@@ -276,6 +305,37 @@ svg{display:block}
 
 /* ================= FICHAS ================= */
 .fichas{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+
+/* Banda de resumen — un solo contenedor con divisiones internas, no tres
+   tarjetas idénticas flotando por separado. */
+.resumen-banda{display:flex;background:var(--blanco);border-radius:var(--r-l);box-shadow:var(--s2);
+  overflow:hidden;margin-bottom:18px;animation:sube .42s .14s cubic-bezier(.2,.7,.3,1) both}
+.resumen-item{flex:1;display:flex;align-items:center;gap:14px;padding:22px 24px;
+  border-right:1px solid var(--g150);min-width:0}
+.resumen-item:last-child{border-right:0}
+.resumen-ico{width:22px;height:22px;padding:12px;border-radius:13px;background:var(--oro-n);
+  border:1px solid var(--oro-b);box-sizing:content-box;
+  flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.resumen-ico svg{width:22px;height:22px;stroke:var(--oro-o);fill:none;stroke-width:2.1}
+.resumen-texto b{display:block;font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:700;
+  color:var(--g900);line-height:1}
+.resumen-texto span{display:block;font-size:11.5px;color:var(--g500);margin-top:4px;font-weight:500}
+@media (max-width:760px){
+  .resumen-banda{flex-direction:column}
+  .resumen-item{border-right:0;border-bottom:1px solid var(--g150)}
+  .resumen-item:last-child{border-bottom:0}
+}
+
+/* Bloque "Confirma tus datos": avatar en vez de tabla plana — más cálido,
+   consistente con el avatar que ya se ve en el riel. */
+.panel--sube2{animation:sube .42s .26s cubic-bezier(.2,.7,.3,1) both}
+.confirma-fila{display:flex;align-items:center;gap:16px;padding:18px 20px;
+  background:var(--g50);border:1px solid var(--g150);border-radius:var(--r-m);margin-bottom:18px}
+.confirma-avatar{width:48px;height:48px;border-radius:50%;background:var(--oro);color:var(--g950);
+  display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0}
+.confirma-nombre{font-size:16px;font-weight:600;color:var(--g900);letter-spacing:-.01em}
+.confirma-puesto{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--g500);margin-top:4px}
 .ficha{flex:1;min-width:140px;background:var(--blanco);border-radius:var(--r-l);
   padding:24px 26px;position:relative;overflow:hidden;box-shadow:var(--s2)}
 .ficha::after{content:'';position:absolute;left:26px;right:26px;top:0;height:3px;
@@ -285,6 +345,87 @@ svg{display:block}
 .ficha.apagada .ficha-n{color:var(--g300)}
 .ficha-k{font-size:8px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
   color:var(--g400);margin-top:13px;line-height:1.7}
+.ficha-ico{width:20px;height:20px;padding:10px;border-radius:12px;background:var(--oro-n);
+  display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;box-sizing:content-box}
+.ficha-ico svg{width:20px;height:20px;stroke:var(--oro-o);fill:none;stroke-width:2}
+
+/* ================= LISTA CON ÍCONOS ================= */
+.inicio-lista{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  background:var(--g150);gap:1px}
+.inicio-it{background:var(--blanco);padding:24px 26px;display:flex;gap:16px;align-items:flex-start;
+  transition:background .22s}
+.inicio-it:hover{background:var(--oro-n)}
+.inicio-ico{width:22px;height:22px;padding:12px;border-radius:14px;box-sizing:content-box;
+  background:var(--oro-n);flex-shrink:0}
+.inicio-ico svg{width:22px;height:22px;stroke:var(--oro-o);fill:none;stroke-width:1.8}
+.inicio-it b{display:block;font-size:14px;font-weight:600;margin-bottom:6px;letter-spacing:-.012em}
+.inicio-it span{font-size:12.5px;color:var(--g500);line-height:1.68;display:block;
+  text-align:justify;text-justify:inter-word;hyphens:none;-webkit-hyphens:none}
+
+/* ================= INSIGNIA ================= */
+.badge{display:inline-flex;align-items:center;gap:6px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  padding:5px 12px;border-radius:999px;background:var(--oro-n);color:var(--oro-o);
+  border:1px solid var(--oro-b)}
+
+/* ================= PANTALLA "ANTES DE COMENZAR" ================= */
+/* Barra de acento en la esquina, igual que en la cabecera principal. */
+.panel--acento{position:relative;overflow:hidden}
+.panel--acento::before{content:'';position:absolute;left:0;top:0;width:110px;height:4px;
+  background:var(--oro);border-radius:0 0 4px 0;z-index:3}
+.intro-encabezado{padding:38px 32px 22px;display:flex;flex-direction:column;align-items:flex-start}
+.intro-titulo{font-size:32px;font-weight:600;letter-spacing:-.026em;color:var(--g900);
+  margin:14px 0 14px}
+.intro-confirmacion{background:var(--g900);margin:18px -1px -1px;padding:26px 32px;
+  display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.intro-confirmacion__k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:rgba(255,255,255,.42);font-weight:700}
+.intro-confirmacion__pregunta{font-size:16.5px;font-weight:600;color:#fff;margin-top:7px;letter-spacing:-.012em}
+.btn-dorado{background:var(--oro);color:var(--g950);padding:16px 30px}
+.btn-dorado:hover:not(:disabled){background:var(--oro-h);transform:translateY(-1px)}
+.btn-dorado:disabled{background:rgba(255,255,255,.14);color:rgba(255,255,255,.4)}
+
+/* ================= PANTALLA "ANTES DE COMENZAR" ================= */
+.reglas-lead{margin-top:8px;color:var(--g700);font-size:14.5px;font-weight:500;line-height:1.7;max-width:520px}
+
+/* Único momento dorado de la pantalla: el reloj. Todo lo demás alrededor
+   se queda deliberadamente en gris — el oro no se reparte parejo. */
+.intro-hero{display:flex;align-items:center;gap:26px;margin:8px 32px 6px;
+  padding:24px 28px;background:var(--oro-n);border:1px solid var(--oro-b);border-radius:var(--r-l)}
+.intro-hero__reloj{width:96px;height:96px;flex-shrink:0}
+.intro-hero__reloj svg{width:100%;height:100%}
+.intro-hero__texto{flex:1;min-width:0}
+.intro-hero__num{font-family:'IBM Plex Mono',monospace;font-size:38px;font-weight:700;
+  color:var(--g900);letter-spacing:-.02em;display:block;margin-bottom:6px;line-height:1}
+.intro-hero__num small{font-size:15px;font-weight:600;color:var(--oro-o);margin-left:5px}
+.intro-hero__texto p{font-size:13.5px;color:var(--g700);line-height:1.65;margin:0;max-width:460px}
+
+/* Los otros tres datos: cada uno en su propio contenedor — no una lista de
+   divisores, que se leía plana. El punto dorado sí pulsa de verdad, con la
+   misma animación que ya usa el indicador de estado del riel. */
+.reglas-lista{list-style:none;margin:8px 32px 4px;padding:0;display:flex;flex-direction:column;gap:10px}
+.reglas-lista li{display:flex;gap:16px;align-items:center;padding:17px 19px;
+  background:var(--g50);border:1px solid var(--g150);border-radius:var(--r-m);
+  animation:sube .42s cubic-bezier(.2,.7,.3,1) both}
+.reglas-lista li:nth-child(1){animation-delay:.55s}
+.reglas-lista li:nth-child(2){animation-delay:.68s}
+.reglas-lista li:nth-child(3){animation-delay:.81s}
+.reglas-lista__ico{position:relative;width:22px;height:22px;padding:13px;border-radius:14px;
+  background:var(--oro-n);border:1px solid var(--oro-b);box-sizing:content-box;
+  flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.reglas-lista__ico svg{width:22px;height:22px;stroke:var(--oro-o);fill:none;stroke-width:2.2}
+.reglas-lista__pulso{position:absolute;top:-3px;right:-3px;width:10px;height:10px;
+  border-radius:50%;background:var(--oro);box-shadow:0 0 0 2px var(--g50)}
+.reglas-lista__pulso::after{content:'';position:absolute;inset:0;border-radius:50%;
+  background:var(--oro);animation:pulsoDot 1.8s ease-out infinite}
+@keyframes pulsoDot{
+  0%{transform:scale(1);opacity:.7}
+  100%{transform:scale(2.6);opacity:0}
+}
+.reglas-lista b{display:block;font-size:14.5px;font-weight:600;color:var(--g900);margin-bottom:4px;
+  letter-spacing:-.008em}
+.reglas-lista span{display:block;font-size:13px;color:var(--g600);line-height:1.6}
+@media (prefers-reduced-motion: reduce){.reglas-lista__pulso::after{animation:none}}
 
 /* ================= VACÍO / ERROR ================= */
 .vacio{margin-top:0;background:var(--blanco);border-radius:var(--r-l);
@@ -300,13 +441,18 @@ svg{display:block}
    de avance. Usa exactamente los mismos tokens de color y radio que el
    resto del sistema para que no se note la costura.
    ========================================================================== */
-.opcion-ex{display:flex;align-items:flex-start;gap:14px;padding:16px 18px;
+.opcion-ex{display:flex;align-items:center;gap:14px;padding:16px 18px;
   border:1.5px solid var(--g200);border-radius:var(--r-m);margin-bottom:10px;
   cursor:pointer;font-size:14px;color:var(--g800);background:var(--blanco);
   transition:border-color .18s,background .18s}
 .opcion-ex:hover{border-color:var(--oro-b)}
 .opcion-ex.elegida{border-color:var(--oro);background:var(--oro-n);font-weight:600;color:var(--g900)}
-.opcion-ex input{accent-color:var(--oro-h);margin-top:2px}
+.opcion-ex__input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.opcion-ex__punto{width:22px;height:22px;border-radius:50%;border:2px solid var(--g300);
+  flex-shrink:0;transition:border-color .18s,background .18s,box-shadow .18s}
+.opcion-ex.elegida .opcion-ex__punto{border-color:var(--oro-h);background:var(--oro-h);
+  box-shadow:inset 0 0 0 4px var(--blanco)}
+.opcion-ex__input:focus-visible + .opcion-ex__punto{outline:2px solid var(--oro-h);outline-offset:2px}
 .barra-ex{height:4px;background:var(--g150);border-radius:99px;overflow:hidden;margin-bottom:22px}
 .barra-ex__r{height:100%;background:var(--oro);transition:width .25s ease}
 .tema-ex{display:inline-block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;
@@ -323,6 +469,96 @@ svg{display:block}
 
 /* Entrada de cada pregunta nueva: mismo timing que el resto del sistema. */
 .panel-entra{animation:sube .32s cubic-bezier(.2,.7,.3,1)}
+
+/* Feedback inmediato al enviar una respuesta — en lo que el servidor
+   responde, el panel se atenúa en vez de quedarse "congelado" sin aviso. */
+.cargando-suave{opacity:.5;pointer-events:none;transition:opacity .15s ease}
+
+/* Bloqueo real de selección de texto durante el examen (además de
+   copy/cut/contextmenu, que ya se bloquean por JS). */
+.examen-proteger{user-select:none;-webkit-user-select:none;-ms-user-select:none}
+
+/* ================= RESULTADO ================= */
+.resultado-hero{background:var(--blanco);border-radius:var(--r-l);box-shadow:var(--s2);
+  padding:44px 40px 38px;text-align:center;position:relative;overflow:hidden}
+.resultado-hero::before{content:'';position:absolute;left:0;right:0;top:0;height:4px}
+.resultado-hero.libre::before{background:var(--verde)}
+.resultado-hero.alto::before{background:var(--rojo)}
+.resultado-hero.ambar::before{background:var(--oro)}
+
+/* La calificación es el único protagonista de esta pantalla — un anillo
+   real de avance, no una insignia decorativa ni tarjetas repetidas con el
+   mismo dato. Se llena con una sola animación orquestada al cargar. */
+.resultado-anillo{position:relative;width:152px;height:152px;margin:0 auto 24px;
+  animation:insigniaPop .5s cubic-bezier(.2,1.4,.4,1) both}
+.resultado-anillo svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ro-pista{fill:none;stroke:var(--g150);stroke-width:9}
+.ro-avance{fill:none;stroke-width:9;stroke-linecap:round;
+  transition:stroke-dashoffset 1.15s cubic-bezier(.2,.7,.3,1)}
+.ro-avance.libre{stroke:var(--verde)}
+.ro-avance.alto{stroke:var(--rojo)}
+.ro-avance.ambar{stroke:var(--oro)}
+.resultado-anillo__centro{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center}
+.resultado-anillo__num{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:700;
+  color:var(--g900);line-height:1;letter-spacing:-.01em}
+.resultado-anillo__pct{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--g500);
+  margin-top:5px}
+
+/* Sello que confirma aprobado/no aprobado — entra justo cuando el anillo
+   termina de llenarse, como una segunda confirmación, no como decoración
+   simultánea que compite con el número. */
+/* Badge posicionado en la esquina del anillo — ahí la geometría del círculo
+   deja margen libre de forma natural (las esquinas de un cuadro siempre
+   quedan más lejos del centro que un círculo inscrito), así que no hace
+   falta pelear con la alineación de ningún texto. */
+/* Acento de esquina, independiente del anillo y del texto — vive en la
+   esquina de la TARJETA completa, como si el confeti llegara desde afuera.
+   Al no compartir línea con ningún texto ni tocar el círculo, no hay
+   alineación que pelear. */
+.resultado-confeti-esquina{position:absolute;top:24px;right:20px;width:90px;height:90px;
+  transform:rotate(14deg) scale(.4);opacity:0;pointer-events:none;z-index:2;
+  animation:confetiEntra .6s .35s cubic-bezier(.2,1.4,.4,1) both}
+.resultado-confeti-esquina video{width:100%;height:100%;object-fit:cover;mix-blend-mode:multiply}
+.resultado-confeti-esquina img{width:100%;height:100%;object-fit:contain}
+@keyframes confetiEntra{
+  0%{transform:rotate(28deg) scale(.3) translate(14px,-14px);opacity:0}
+  70%{transform:rotate(10deg) scale(1.06) translate(0,0);opacity:1}
+  100%{transform:rotate(14deg) scale(1) translate(0,0);opacity:1}
+}
+
+.resultado-folio{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--g400);
+  margin-top:8px;letter-spacing:.02em}
+.resultado-folio .mono{color:var(--g600);font-weight:600}
+
+.resultado-titulo{font-size:28px;font-weight:600;letter-spacing:-.022em;margin-bottom:8px}
+.resultado-sub{font-size:14.5px;color:var(--g500);max-width:440px;margin:0 auto;line-height:1.6}
+.resultado-acciones{margin-top:26px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+@keyframes insigniaPop{
+  0%{transform:scale(.35);opacity:0}
+  60%{transform:scale(1.1);opacity:1}
+  100%{transform:scale(1)}
+}
+.resultado-titulo{animation:sube .4s .2s cubic-bezier(.2,.7,.3,1) both}
+.resultado-sub,.resultado-acciones{animation:sube .4s .32s cubic-bezier(.2,.7,.3,1) both}
+
+/* Confeti — piezas independientes que caen con giro y ligera deriva
+   lateral, en la paleta institucional (oro, carbón, blanco, verde). */
+.confeti-pieza{
+  position:fixed;top:-24px;left:0;pointer-events:none;z-index:500;opacity:.95;
+  will-change:transform,opacity;animation-name:confetiCae;
+  animation-timing-function:cubic-bezier(.25,.46,.45,.94);animation-fill-mode:forwards}
+@keyframes confetiCae{
+  0%{transform:translate(0,0) rotate(0deg);opacity:1}
+  85%{opacity:1}
+  100%{transform:translate(var(--deriva,0px),108vh) rotate(var(--giro,360deg));opacity:0}
+}
+@media (prefers-reduced-motion: reduce){
+  .resultado-anillo,.resultado-titulo,.resultado-sub,.resultado-acciones,
+  .resultado-confeti-esquina,.reglas-lista li{animation:none;opacity:1}
+  .ro-avance{transition:none}
+}
 
 /* ================= ACCESIBILIDAD ================= */
 /* Texto presente para lectores de pantalla, invisible en pantalla. */
