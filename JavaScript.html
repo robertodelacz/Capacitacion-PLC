@@ -2,39 +2,21 @@
   let datosSeleccion = null;
   let preguntaActualId = null;
   let opcionSeleccionada = null;
+  let progresoActual = null;
   let segundosLocal = 0;
   let temporizadorTick = null;
   let temporizadorSync = null;
   let examenEnCurso = false;
-  let cambiosFoco = 0;
   const inicioCarga = Date.now();
   const ESPERA_MIN_SPLASH = 900;
 
-  // Anti-fraude ligero: se registra (no se bloquea) cada vez que la persona
-  // sale de la pestaña mientras el examen está activo. Queda en el historial
-  // del intento para que el oficial de cumplimiento lo revise si lo necesita.
-  document.addEventListener('visibilitychange', () => {
-    if (examenEnCurso && document.hidden) {
-      cambiosFoco++;
-      mostrarAviso('Se detectó que saliste de esta pestaña. Este evento queda registrado.');
-    }
-  });
-
-  // Fricción básica contra copiar el contenido del examen — no impide a
-  // alguien decidido, pero desalienta compartirlo por copiar/pegar casual.
+  // Bloqueo de copiar/clic derecho mientras el examen está activo — evita
+  // vaciar las preguntas hacia otra herramienta con un copiar/pegar casual.
+  // No incluye detección de cambio de pestaña: los compañeros pueden estar
+  // atendiendo otro pendiente en paralelo, y eso no debe registrarse.
   document.addEventListener('contextmenu', (e) => { if (examenEnCurso) e.preventDefault(); });
   document.addEventListener('copy', (e) => { if (examenEnCurso) e.preventDefault(); });
   document.addEventListener('cut', (e) => { if (examenEnCurso) e.preventDefault(); });
-
-  function mostrarAviso(texto) {
-    document.querySelectorAll('.toast').forEach(t => t.remove());
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.setAttribute('role', 'status');
-    toast.innerHTML = `<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19L12 3z"/><path d="M12 10v4"/><path d="M12 17.4v.6"/></svg><span>${texto}</span>`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-  }
 
   document.addEventListener('DOMContentLoaded', () => {
     // Dispersión: si mucha gente abre el enlace en el mismo instante (justo
@@ -107,15 +89,18 @@
 
   function mostrarError(error) {
     const mensaje = (error && error.message) || String(error);
-    const esSaturacion = /simult|too many|quota|demasiad/i.test(mensaje);
+    // Por default, cualquier error se trata como transitorio (cuota, bloqueo
+    // de escritura, timeout de red) y se recupera solo consultando el estado
+    // real — así ningún tropiezo de infraestructura trunca el examen a
+    // medias. Solo esta lista corta, de errores de negocio genuinos que
+    // nosotros mismos lanzamos, se muestra tal cual porque reintentar no
+    // cambiaría nada.
+    const esPermanente = /no autorizado|no está en el roster|no es posible iniciar|ya tienes un examen en curso|no se encontró una constancia|falta configurar/i.test(mensaje);
 
-    if (esSaturacion) {
-      // Con toda la organización presentando a la vez, es normal tocar
-      // momentáneamente el límite de ejecuciones simultáneas de Apps Script.
-      // Tu progreso ya vive en el servidor — no se pierde nada. Reintenta solo.
+    if (!esPermanente) {
       detenerTemporizador();
-      document.getElementById('app').innerHTML = pantallaCargando('Hay mucha actividad en este momento, reintentando…');
-      setTimeout(() => { llamarServidor('iniciar', [], renderizar); }, 3500);
+      document.getElementById('app').innerHTML = pantallaCargando('Confirmando tu progreso…');
+      setTimeout(() => { llamarServidor('iniciar', [], renderizar); }, 2000);
       return;
     }
 
@@ -183,23 +168,16 @@
     actualizarIdentidad(d.nombre, '');
     actualizarRielInfo('Ya presentaste tu examen');
     actualizarVigencia('verde', 'Aprobado');
+    setTimeout(() => animarAnillo(d.calificacion, d.total), 30);
     return `
-      <div class="panel">
-        <div class="panel-h">
-          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
-          <h2>Resultado</h2>
-        </div>
-        <div class="panel-b">
-          <span class="estatus libre">
-            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
-            Aprobado
-          </span>
-          <p style="margin-top:16px;color:var(--g500)">Calificación obtenida: ${d.calificacion}. El acceso a un nuevo examen está bloqueado para esta campaña.</p>
-          <div style="margin-top:22px;display:flex;gap:12px;flex-wrap:wrap">
-            <button class="btn btn-pri" onclick="descargarConstanciaExistente()">Descargar constancia</button>
-            <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
-          </div>
+      <div class="resultado-hero libre">
+        ${confetiEsquinaHTML('libre')}
+        ${anilloHTML(d.calificacion, d.total, 'libre')}
+        <div class="resultado-titulo">¡Ya aprobaste!</div>
+        <p class="resultado-sub">${d.nombre.split(' ')[0]}, tu Capacitación Anual PLD-FT ya quedó acreditada. Puedes descargar tu constancia cuando la necesites — el acceso a un nuevo intento está bloqueado para esta campaña.</p>
+        <div class="resultado-acciones">
+          <button class="btn btn-pri" onclick="descargarConstanciaExistente()">Descargar constancia</button>
+          <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
         </div>
       </div>`;
   }
@@ -218,7 +196,7 @@
   function pantallaSeleccion(d) {
     datosSeleccion = d;
     actualizarIdentidad(d.nombre, d.puesto);
-    actualizarRielInfo('Examen disponible');
+    actualizarRielInfo('Capacitación Anual PLD-FT');
     actualizarVigencia('verde', `${d.intentosRestantes} intento(s) disponibles`);
     return `
       <header class="cabecera panel-cab">
@@ -230,6 +208,14 @@
              que inicies, el reloj de ${d.duracionMinutos} minutos no se detiene.</p>
         </div>
         <div class="cab-der">
+          <div class="cab-fig cab-fig--pop">
+            <svg viewBox="0 0 180 180" fill="none">
+              <circle cx="90" cy="90" r="76" fill="#FFFBEF"/>
+              <circle cx="90" cy="90" r="76" stroke="#F7DC96" stroke-width="1.5" stroke-dasharray="4 8"/>
+              <path d="M90 40l38 14v28c0 32-16 54-38 62-22-8-38-30-38-62V54l38-14z" fill="#fff" stroke="#15171C" stroke-width="3"/>
+              <path d="M74 90l12 12 24-26" stroke="#FDB913" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
           <div class="cab-estado">
             <span class="cab-foco verde"></span>
             <div><div class="cab-k">Intentos disponibles</div><div class="cab-v">${d.intentosRestantes}</div></div>
@@ -237,38 +223,42 @@
         </div>
       </header>
 
-      <div class="fichas">
-        <div class="ficha viva"><div class="ficha-n">${d.numPreguntas}</div><div class="ficha-k">Preguntas</div></div>
-        <div class="ficha viva"><div class="ficha-n">${d.duracionMinutos}</div><div class="ficha-k">Minutos</div></div>
-        <div class="ficha viva"><div class="ficha-n">${d.puntajeMinimo}</div><div class="ficha-k">Mínimo para aprobar</div></div>
+      <div class="resumen-banda">
+        <div class="resumen-item">
+          <div class="resumen-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></div>
+          <div class="resumen-texto"><b>${d.numPreguntas}</b><span>Preguntas</span></div>
+        </div>
+        <div class="resumen-item">
+          <div class="resumen-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></div>
+          <div class="resumen-texto"><b>${d.duracionMinutos}</b><span>Minutos</span></div>
+        </div>
+        <div class="resumen-item">
+          <div class="resumen-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <div class="resumen-texto"><b>${d.puntajeMinimo}</b><span>Mínimo para aprobar</span></div>
+        </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-b" style="text-align:center">
-          <button class="btn btn-pri" onclick="mostrarConfirmacionIdentidad()">Seleccionar este examen</button>
-        </div>
-      </div>`;
-  }
-
-  function mostrarConfirmacionIdentidad() {
-    const d = datosSeleccion;
-    actualizarRielInfo('Confirmando identidad');
-    document.getElementById('app').innerHTML = `
-      <div class="panel">
+      <div class="panel panel--sube2">
         <div class="panel-h">
           <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg>
           <h2>Confirma tus datos</h2>
         </div>
         <div class="panel-b">
-          <div class="cuadro">
-            <div class="cel"><div class="cel-k">Nombre completo</div><div class="cel-v">${d.nombre}</div></div>
-            <div class="cel"><div class="cel-k">Puesto</div><div class="cel-v">${d.puesto}</div></div>
+          <div class="confirma-fila">
+            <div class="confirma-avatar">${iniciales(d.nombre)}</div>
+            <div>
+              <div class="confirma-nombre">${d.nombre}</div>
+              <div class="confirma-puesto">${d.puesto}</div>
+            </div>
           </div>
           <p class="campo-ayuda">Estos datos son los que aparecerán en tu constancia si apruebas.
-             Una vez que inicies, el reloj de ${d.duracionMinutos} minutos no se detiene.</p>
+             Una vez que inicies, el reloj no se detiene.</p>
           <div style="display:flex;gap:12px;margin-top:22px;flex-wrap:wrap">
-            <button class="btn btn-pri" onclick="confirmarIdentidad()">Sí, son correctos — comenzar</button>
+            <button class="btn btn-pri" onclick="confirmarIdentidad()">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+              Comenzar examen
+            </button>
             <button class="btn btn-borde" onclick="reportarDatoIncorrecto()">Mis datos están mal</button>
           </div>
         </div>
@@ -279,16 +269,104 @@
     alert('Contacta al oficial de cumplimiento para corregir tu registro antes de presentar el examen.');
   }
 
+  let resultadoExamenPendiente = null;
+
   function confirmarIdentidad() {
-    document.getElementById('app').innerHTML = pantallaCargando('Preparando tu examen');
-    // Este es el momento más sincronizado de todos: mucha gente confirmando
-    // "sí, soy yo" casi al mismo tiempo tras la capacitación. Se dispersa
-    // igual que la carga inicial.
+    mostrarInstrucciones(datosSeleccion);
+    // El examen se prepara en el servidor en cuanto se muestran las
+    // instrucciones — el tiempo que la persona usa en leerlas es también
+    // el tiempo de carga, así que para cuando le den clic a "Comenzar",
+    // normalmente ya está listo.
     const espera = Math.random() * 3000;
-    setTimeout(() => { llamarServidor('confirmarIdentidadEIniciar', [], iniciarExamenConSesion); }, espera);
+    setTimeout(() => {
+      llamarServidor('confirmarIdentidadEIniciar', [], (r) => {
+        resultadoExamenPendiente = r;
+        habilitarBotonInstrucciones();
+      });
+    }, espera);
   }
 
-  function iniciarExamenConSesion(r) {
+  function mostrarInstrucciones(d) {
+    actualizarRielInfo(`
+      <div class="riel-stat"><span class="riel-stat__k">Tiempo estimado</span><span class="riel-stat__v">${d.duracionMinutos} minutos</span></div>
+      <div class="riel-stat"><span class="riel-stat__k">Intentos</span><span class="riel-stat__v">${d.intentosRestantes} de ${d.maxIntentos} disponibles</span></div>
+    `);
+    document.getElementById('app').innerHTML = `
+      <div class="panel panel-entra panel--acento">
+        <div class="intro-encabezado">
+          <h1 class="intro-titulo">Antes de comenzar</h1>
+          <p class="reglas-lead">Esta evaluación mide tus conocimientos sobre las políticas y criterios en materia de Prevención de Lavado de Dinero y Financiamiento al Terrorismo.</p>
+        </div>
+
+        <div class="intro-hero">
+          <div class="intro-hero__reloj">
+            <svg viewBox="0 0 120 120" fill="none" aria-hidden="true">
+              <circle cx="60" cy="60" r="50" stroke="var(--g300)" stroke-width="2"/>
+              <path d="M60 60 L60 14 A46 46 0 0 1 98 82 Z" fill="var(--oro)" opacity=".22"/>
+              <g stroke="var(--g400)" stroke-width="2" stroke-linecap="round">
+                <line x1="60" y1="14" x2="60" y2="22"/>
+                <line x1="60" y1="98" x2="60" y2="106"/>
+                <line x1="14" y1="60" x2="22" y2="60"/>
+                <line x1="98" y1="60" x2="106" y2="60"/>
+              </g>
+              <line x1="60" y1="60" x2="60" y2="24" stroke="var(--g900)" stroke-width="4.5" stroke-linecap="round"/>
+              <line x1="60" y1="60" x2="90" y2="80" stroke="var(--oro-h)" stroke-width="4.5" stroke-linecap="round"/>
+              <circle cx="60" cy="60" r="5.5" fill="var(--g900)"/>
+            </svg>
+          </div>
+          <div class="intro-hero__texto">
+            <span class="intro-hero__num">${d.duracionMinutos}<small>min</small></span>
+            <p>El reloj corre en cuanto le des clic a "Comenzar mi examen" y no se detiene — ni si cierras la pestaña por accidente. El examen sigue corriendo del lado del servidor, no en tu navegador.</p>
+          </div>
+        </div>
+
+        <ul class="reglas-lista">
+          <li>
+            <div class="reglas-lista__ico"><span class="reglas-lista__pulso"></span><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></div>
+            <div>
+              <b>${d.numPreguntas} preguntas, una a la vez y en orden aleatorio</b>
+              <span>No podrás regresar a una pregunta anterior una vez que avances a la siguiente.</span>
+            </div>
+          </li>
+          <li>
+            <div class="reglas-lista__ico"><span class="reglas-lista__pulso"></span><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></div>
+            <div>
+              <b>Mínimo ${d.puntajeMinimo} de ${d.numPreguntas} para aprobar</b>
+              <span>Tienes hasta ${d.maxIntentos} intentos en total — te quedan ${d.intentosRestantes} disponible(s). Si apruebas, no podrás volver a presentar esta campaña.</span>
+            </div>
+          </li>
+          <li>
+            <div class="reglas-lista__ico"><span class="reglas-lista__pulso"></span><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg></div>
+            <div>
+              <b>La constancia se descarga al instante</b>
+              <span>En cuanto apruebes, se genera automáticamente y puedes descargarla desde esta misma pantalla.</span>
+            </div>
+          </li>
+        </ul>
+
+        <div class="intro-confirmacion">
+          <div>
+            <span class="intro-confirmacion__k">Confirmación</span>
+            <p class="intro-confirmacion__pregunta">¿Listo para comenzar tu examen ahora?</p>
+          </div>
+          <button class="btn btn-dorado" id="btnComenzarExamen" disabled onclick="comenzarExamenDesdeInstrucciones()">
+            <span id="txtBtnComenzar">Preparando…</span>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  function habilitarBotonInstrucciones() {
+    const btn = document.getElementById('btnComenzarExamen');
+    if (!btn) return; // la persona ya avanzó a otra pantalla
+    btn.disabled = false;
+    document.getElementById('txtBtnComenzar').textContent = 'Comenzar mi examen';
+  }
+
+  function comenzarExamenDesdeInstrucciones() {
+    if (!resultadoExamenPendiente) return;
+    const r = resultadoExamenPendiente;
+    resultadoExamenPendiente = null;
     renderPregunta(r.pregunta, r.progreso, r.segundosRestantes);
     iniciarTemporizador(r.segundosRestantes);
   }
@@ -297,26 +375,29 @@
     preguntaActualId = pregunta.id;
     opcionSeleccionada = null;
     examenEnCurso = true;
+    progresoActual = progreso;
     const pctPrevio = ((progreso.actual - 1) / progreso.total) * 100;
     actualizarRielInfo(`Pregunta ${progreso.actual} de ${progreso.total}`);
     document.getElementById('app').innerHTML = `
-      <div class="panel panel-entra">
+      <div class="panel panel-entra examen-proteger">
         <div class="panel-h">
           <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.4v.6"/></svg>
-          <h2>${pregunta.tema}</h2>
+          <h2>Capacitación Anual PLD-FT</h2>
           <span class="panel-n">Pregunta ${progreso.actual} de ${progreso.total}</span>
           <span class="reloj-ex mono" id="relojEx">--:--</span>
         </div>
         <div class="panel-b">
           <div class="barra-ex"><div class="barra-ex__r" style="width:${pctPrevio}%"></div></div>
+          <span class="tema-ex">${pregunta.tema}</span>
           <p class="pregunta-ex">${pregunta.pregunta}</p>
           <fieldset style="border:0;padding:0;margin:0">
             <legend class="sr-only">Opciones de respuesta, elige una</legend>
             <div id="opciones">
               ${Object.entries(pregunta.opciones).map(([letra, texto]) => `
                 <label class="opcion-ex" data-letra="${letra}">
-                  <input type="radio" name="opcion" value="${letra}" onchange="marcarOpcion('${letra}')">
+                  <input type="radio" name="opcion" value="${letra}" class="opcion-ex__input" onchange="marcarOpcion('${letra}')">
+                  <span class="opcion-ex__punto" aria-hidden="true"></span>
                   <span>${texto}</span>
                 </label>`).join('')}
             </div>
@@ -339,10 +420,58 @@
 
   function enviarRespuestaActual() {
     if (!opcionSeleccionada) return;
-    document.getElementById('btnSiguiente').disabled = true;
+    detenerTemporizador(); // evita que el ping de sincronización choque con esta respuesta
+    const esUltima = progresoActual && progresoActual.actual >= progresoActual.total;
     const id = preguntaActualId;
     const opcion = opcionSeleccionada;
-    llamarServidor('responderPreguntaActual', [id, opcion, cambiosFoco], manejarAvance);
+    if (esUltima) {
+      document.getElementById('app').innerHTML = pantallaEvaluando();
+      iniciarFrasesEvaluando();
+    } else {
+      const btn = document.getElementById('btnSiguiente');
+      btn.disabled = true;
+      btn.textContent = 'Cargando…';
+      document.querySelector('.panel-entra').classList.add('cargando-suave');
+    }
+    llamarServidor('responderPreguntaActual', [id, opcion], manejarAvance);
+  }
+
+  function pantallaEvaluando() {
+    return `
+      <div class="evaluando">
+        <div class="evaluando__aro">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <circle class="evaluando__pista" cx="32" cy="32" r="27"/>
+            <circle class="evaluando__giro" cx="32" cy="32" r="27"/>
+          </svg>
+          <svg class="evaluando__check" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+        </div>
+        <div class="evaluando__titulo">Evaluando tus respuestas…</div>
+        <div class="evaluando__frase" id="evaluandoFrase">Revisando tu último recorrido</div>
+      </div>`;
+  }
+
+  function iniciarFrasesEvaluando() {
+    const frases = [
+      'Revisando tu último recorrido',
+      'Comparando tus respuestas',
+      'Calculando tu calificación',
+      'Ya casi está listo'
+    ];
+    let i = 0;
+    const el = document.getElementById('evaluandoFrase');
+    const intervalo = setInterval(() => {
+      if (!el || !document.body.contains(el)) { clearInterval(intervalo); return; }
+      i = (i + 1) % frases.length;
+      el.style.opacity = 0;
+      setTimeout(() => {
+        if (!document.body.contains(el)) return;
+        el.textContent = frases[i];
+        el.style.opacity = 1;
+      }, 200);
+    }, 1400);
   }
 
   function manejarAvance(r) {
@@ -352,7 +481,7 @@
       mostrarResultado(r);
     } else {
       renderPregunta(r.pregunta, r.progreso, r.segundosRestantes);
-      segundosLocal = r.segundosRestantes;
+      iniciarTemporizador(r.segundosRestantes);
     }
   }
 
@@ -382,6 +511,12 @@
 
   function manejarVerificacion(r) {
     if (!r.sesionActiva) {
+      if (r.terminado === undefined) {
+        // No hay sesión, pero tampoco trae un resultado: lo más probable es
+        // que la respuesta que se acaba de enviar ya esté resolviendo esto
+        // por su cuenta. No pisar la pantalla con datos incompletos.
+        return;
+      }
       examenEnCurso = false;
       detenerTemporizador();
       mostrarResultado(r);
@@ -403,71 +538,150 @@
     }
   }
 
+  const RADIO_ANILLO = 50;
+  const CIRCUNFERENCIA_ANILLO = 2 * Math.PI * RADIO_ANILLO;
+
+  // ============================================================
+  // Pega aquí la URL de tu ícono animado para el sello de "aprobado"
+  // (GIF, WEBP animado o PNG). Si la dejas vacía (''), se usa la
+  // palomita normal como respaldo — nunca se rompe la pantalla.
+  // ============================================================
+  const URL_ICONO_APROBADO_ANIMADO = 'https://cdn-icons-mp4.magnific.com/512/13374/13374615.mp4';
+
+  function anilloHTML(aciertos, total, tono) {
+    const pct = total > 0 ? Math.round((aciertos / total) * 100) : 0;
+    return `
+      <div class="resultado-anillo">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ro-pista" cx="60" cy="60" r="${RADIO_ANILLO}"/>
+          <circle class="ro-avance ${tono}" id="roAvance" cx="60" cy="60" r="${RADIO_ANILLO}"
+            stroke-dasharray="${CIRCUNFERENCIA_ANILLO}" stroke-dashoffset="${CIRCUNFERENCIA_ANILLO}"/>
+        </svg>
+        <div class="resultado-anillo__centro">
+          <span class="resultado-anillo__num">${aciertos}/${total}</span>
+          <span class="resultado-anillo__pct">${pct}%</span>
+        </div>
+      </div>`;
+  }
+
+  /** Acento de esquina, independiente del anillo y del texto — solo para
+      cuando sí se aprobó. Entra como si el confeti "cayera" desde la
+      esquina de la tarjeta, no como una insignia pegada a otro elemento. */
+  function confetiEsquinaHTML(tono) {
+    if (tono === 'alto' || !URL_ICONO_APROBADO_ANIMADO) return '';
+    const esVideo = /\.(mp4|webm|mov)(\?|$)/i.test(URL_ICONO_APROBADO_ANIMADO);
+    const contenido = esVideo
+      ? `<video autoplay loop muted playsinline webkit-playsinline><source src="${URL_ICONO_APROBADO_ANIMADO}" type="video/mp4"></video>`
+      : `<img src="${URL_ICONO_APROBADO_ANIMADO}" alt="">`;
+    return `<div class="resultado-confeti-esquina" aria-hidden="true">${contenido}</div>`;
+  }
+
+  function animarAnillo(aciertos, total) {
+    const el = document.getElementById('roAvance');
+    if (!el) return;
+    const frac = total > 0 ? aciertos / total : 0;
+    const offsetFinal = CIRCUNFERENCIA_ANILLO * (1 - frac);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.style.strokeDashoffset = offsetFinal;
+    }));
+  }
+
+  function lanzarConfeti() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const colores = ['#FDB913', '#C99100', '#1C1C1C', '#FFFFFF', '#1B6E45'];
+    const contenedor = document.createElement('div');
+    contenedor.setAttribute('aria-hidden', 'true');
+
+    const piezas = 90;
+    for (let i = 0; i < piezas; i++) {
+      const pieza = document.createElement('span');
+      pieza.className = 'confeti-pieza';
+      const circulo = Math.random() > 0.5;
+      const ancho = circulo ? 8 : 6 + Math.random() * 5;
+      const alto = circulo ? 8 : 10 + Math.random() * 8;
+      pieza.style.left = (Math.random() * 100) + 'vw';
+      pieza.style.width = ancho + 'px';
+      pieza.style.height = alto + 'px';
+      pieza.style.background = colores[Math.floor(Math.random() * colores.length)];
+      pieza.style.borderRadius = circulo ? '50%' : '2px';
+      pieza.style.animationDuration = (2.3 + Math.random() * 1.7) + 's';
+      pieza.style.animationDelay = (Math.random() * 0.5) + 's';
+      pieza.style.setProperty('--deriva', (Math.random() * 160 - 80) + 'px');
+      pieza.style.setProperty('--giro', (Math.random() * 720 - 360) + 'deg');
+      contenedor.appendChild(pieza);
+    }
+
+    document.body.appendChild(contenedor);
+    setTimeout(() => contenedor.remove(), 4600);
+  }
+
   function mostrarResultado(r) {
-    const notaTiempo = r.seAgotoElTiempo ? '<p style="margin-top:10px;color:var(--g500);font-style:italic">Se acabó el tiempo antes de terminar el examen.</p>' : '';
+    const notaTiempo = r.seAgotoElTiempo ? '<p class="resultado-sub" style="margin-top:10px;font-style:italic">Se acabó el tiempo antes de terminar el examen.</p>' : '';
 
     if (r.aprobado && r.constanciaPendiente) {
       actualizarRielInfo('Aprobado — constancia pendiente');
       actualizarVigencia('ambar', 'Constancia pendiente');
+      lanzarConfeti();
       document.getElementById('app').innerHTML = `
-        <div class="panel">
-          <div class="panel-b">
-            <span class="estatus libre">
-              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
-              Aprobado
-            </span>
-            <p style="margin-top:16px;color:var(--g500)">${r.aciertos} de ${r.total} correctas. Tu resultado ya quedó registrado, pero la constancia no se pudo generar en automático. Contacta al oficial de cumplimiento o intenta descargarla más tarde.</p>
-            <div style="margin-top:22px"><button class="btn btn-pri" onclick="descargarConstanciaExistente()">Reintentar descarga</button></div>
+        <div class="resultado-hero ambar">
+          ${confetiEsquinaHTML('ambar')}
+          ${anilloHTML(r.aciertos, r.total, 'ambar')}
+          <div class="resultado-titulo">Aprobaste</div>
+          <p class="resultado-sub">Tu resultado ya quedó registrado, pero la constancia no se pudo generar en automático. Contacta al oficial de cumplimiento o intenta descargarla más tarde.</p>
+          <div class="resultado-acciones">
+            <button class="btn btn-pri" onclick="descargarConstanciaExistente()">Reintentar descarga</button>
           </div>
         </div>`;
+      animarAnillo(r.aciertos, r.total);
     } else if (r.aprobado) {
       actualizarRielInfo('Examen aprobado');
       actualizarVigencia('verde', 'Aprobado');
+      lanzarConfeti();
       document.getElementById('app').innerHTML = `
-        <div class="panel">
-          <div class="panel-b">
-            <span class="estatus libre">
-              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
-              Aprobado
-            </span>
-            <p style="margin-top:16px;color:var(--g500)">${r.aciertos} de ${r.total} correctas · Folio ${r.folio}</p>
-            <div style="margin-top:22px;display:flex;gap:12px;flex-wrap:wrap">
-              <button class="btn btn-pri" onclick="descargarPdf('${r.pdfBase64}', '${r.folio}')">Descargar constancia</button>
-              <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
-            </div>
+        <div class="resultado-hero libre">
+          ${confetiEsquinaHTML('libre')}
+          ${anilloHTML(r.aciertos, r.total, 'libre')}
+          <div class="resultado-titulo">¡Felicidades, aprobaste!</div>
+          <p class="resultado-sub">Completaste con éxito tu Capacitación Anual PLD-FT. Tu constancia ya está lista — descárgala y consérvala en tu expediente personal.</p>
+          <div class="resultado-acciones">
+            <button class="btn btn-pri" onclick="descargarPdf('${r.pdfBase64}', '${r.folio}')">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>
+              Descargar constancia
+            </button>
+            <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
           </div>
         </div>`;
+      animarAnillo(r.aciertos, r.total);
     } else if (r.bloqueado) {
       actualizarRielInfo('Intentos agotados');
       actualizarVigencia('rojo', 'Bloqueado');
       document.getElementById('app').innerHTML = `
-        <div class="panel">
-          <div class="panel-b">
-            <span class="estatus">
-              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
-              No aprobado · intentos agotados
-            </span>
-            <p style="margin-top:16px;color:var(--g500)">${r.aciertos} de ${r.total} correctas.</p>
-            ${notaTiempo}
-            <p style="margin-top:10px;color:var(--g500)">Contacta al oficial de cumplimiento: <strong>${r.correoOficial}</strong></p>
-          </div>
+        <div class="resultado-hero alto">
+          ${anilloHTML(r.aciertos, r.total, 'alto')}
+          <div class="resultado-titulo">Intentos agotados</div>
+          <p class="resultado-sub">Alcanzaste el máximo de intentos permitidos.</p>
+          ${notaTiempo}
+          <p class="resultado-sub" style="margin-top:18px">Contacta al oficial de cumplimiento: <strong>${r.correoOficial}</strong></p>
         </div>`;
+      animarAnillo(r.aciertos, r.total);
     } else {
       actualizarRielInfo('No aprobado');
       actualizarVigencia('ambar', `${r.intentosRestantes} intento(s) restantes`);
       document.getElementById('app').innerHTML = `
-        <div class="panel">
-          <div class="panel-b">
-            <span class="estatus">
-              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
-              No aprobado
-            </span>
-            <p style="margin-top:16px;color:var(--g500)">${r.aciertos} de ${r.total} correctas.</p>
-            ${notaTiempo}
-            <p style="margin-top:10px;color:var(--g500)">Te quedan ${r.intentosRestantes} intento(s).</p>
-            <div style="margin-top:22px"><button class="btn btn-pri" onclick="intentarDeNuevo()">Intentar de nuevo</button></div>
+        <div class="resultado-hero alto">
+          ${anilloHTML(r.aciertos, r.total, 'alto')}
+          <div class="resultado-titulo">No aprobaste esta vez</div>
+          <p class="resultado-sub">Te quedan ${r.intentosRestantes} intento(s) para la Capacitación Anual PLD-FT.</p>
+          ${notaTiempo}
+          <div class="resultado-acciones">
+            <button class="btn btn-pri" onclick="intentarDeNuevo()">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 17v-5h5"/></svg>
+              Intentar de nuevo
+            </button>
           </div>
         </div>`;
+      animarAnillo(r.aciertos, r.total);
     }
   }
 
