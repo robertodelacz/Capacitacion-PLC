@@ -21,11 +21,11 @@ function obtenerConfig() {
     if (clave) config[clave] = datos[i][1];
   }
   return {
-    campanaId: config['CAMPANA_ID'] || 'DEMO',
+    campanaId: config['CAMPANA_ID'] || 'PRUEBA-INTERNA-2026',
     ventanaInicio: new Date(config['VENTANA_INICIO']),
     ventanaFin: new Date(config['VENTANA_FIN']),
-    numPreguntasExamen: Number(config['NUM_PREGUNTAS_EXAMEN']) || 5,
-    puntajeMinimo: Number(config['PUNTAJE_MINIMO']) || 4,
+    numPreguntasExamen: Number(config['NUM_PREGUNTAS_EXAMEN']) || 12,
+    puntajeMinimo: Number(config['PUNTAJE_MINIMO']) || 9,
     maxIntentos: Number(config['MAX_INTENTOS']) || 3,
     duracionExamenMinutos: Number(config['DURACION_EXAMEN_MINUTOS']) || 40,
     correoOficialCumplimiento: config['CORREO_OFICIAL_CUMPLIMIENTO'] || '',
