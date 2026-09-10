@@ -85,10 +85,11 @@ function calificarExamen(respuestas, correo) {
   }
 
   let aciertos = 0;
+  const errores = [];
   respuestas.forEach(r => {
     const fila = filasPorId[String(r.id)];
     if (!fila) return;
-    const [, , , a, b, c, d, respuestaCorrecta] = fila;
+    const [, , pregunta, a, b, c, d, respuestaCorrecta] = fila;
     const letras = ['A', 'B', 'C', 'D'];
     const semilla = hashSemilla(correo + '|' + r.id);
     const ordenMezclado = mezclarConSemilla(letras, semilla);
@@ -97,8 +98,18 @@ function calificarExamen(respuestas, correo) {
 
     if (letraCorrectaMostrada && letraCorrectaMostrada === String(r.opcionElegida).toUpperCase()) {
       aciertos++;
+    } else {
+      // Solo se guarda la pregunta y el texto que el usuario eligió — nunca
+      // la opción correcta ni su letra, para que esto no se pueda usar
+      // como respuestario si se comparte con un compañero que aún no presenta.
+      const opcionesMezcladas = mezclarConSemilla([a, b, c, d], semilla);
+      const idxElegida = letras.indexOf(String(r.opcionElegida || '').toUpperCase());
+      errores.push({
+        pregunta,
+        respuestaUsuario: idxElegida >= 0 ? opcionesMezcladas[idxElegida] : null
+      });
     }
   });
 
-  return { aciertos, total: respuestas.length };
+  return { aciertos, total: respuestas.length, errores };
 }
