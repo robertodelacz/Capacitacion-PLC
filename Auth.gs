@@ -16,13 +16,14 @@ function obtenerUsuarioActual() {
   const datos = hoja.getDataRange().getValues();
 
   for (let i = 1; i < datos.length; i++) {
-    const [correoFila, nombre, puesto, activo] = datos[i];
+    const [correoFila, nombre, puesto, activo, puntoExtra] = datos[i];
     if (String(correoFila).trim().toLowerCase() === correo.toLowerCase()) {
       const estaActivo = activo === true || String(activo).toUpperCase() === 'TRUE';
       if (!estaActivo) {
         return { autorizado: false, motivo: 'INACTIVO' };
       }
-      return { autorizado: true, correo, nombre, puesto };
+      const tienePuntoExtra = Number(puntoExtra) === 1;
+      return { autorizado: true, correo, nombre, puesto, puntoExtra: tienePuntoExtra ? 1 : 0 };
     }
   }
 
