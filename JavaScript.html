@@ -179,7 +179,8 @@
           <button class="btn btn-pri" onclick="descargarConstanciaExistente()">Descargar constancia</button>
           <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
         </div>
-      </div>`;
+      </div>
+      ${erroresHTML(d.errores)}`;
   }
 
   function pantallaBloqueado(d) {
@@ -236,6 +237,11 @@
           <div class="resumen-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></div>
           <div class="resumen-texto"><b>${d.puntajeMinimo}</b><span>Mínimo para aprobar</span></div>
         </div>
+        ${d.puntoExtra ? `
+        <div class="resumen-item">
+          <div class="resumen-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></div>
+          <div class="resumen-texto"><b>+1</b><span>Punto extra de la capacitación</span></div>
+        </div>` : ''}
       </div>
 
       <div class="panel panel--sube2">
@@ -316,7 +322,7 @@
           </div>
           <div class="intro-hero__texto">
             <span class="intro-hero__num">${d.duracionMinutos}<small>min</small></span>
-            <p>El reloj corre en cuanto le des clic a "Comenzar mi examen" y no se detiene — ni si cierras la pestaña por accidente. El examen sigue corriendo del lado del servidor, no en tu navegador.</p>
+            <p>El reloj corre en cuanto le des clic a "Comenzar mi examen" y no se detiene — incluso si cierras la pestaña por accidente. El examen sigue corriendo del lado del servidor, no en tu navegador.</p>
           </div>
         </div>
 
@@ -616,8 +622,30 @@
     setTimeout(() => contenedor.remove(), 4600);
   }
 
+  function erroresHTML(errores) {
+    if (!errores || !errores.length) return '';
+    return `
+      <div class="panel panel--sube2" style="margin-top:22px">
+        <div class="panel-h">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+          <h2>Preguntas que contestaste de manera incorrecta:</h2>
+        </div>
+        <div class="panel-b">
+          ${errores.map(e => `
+            <div class="confirma-fila" style="align-items:flex-start">
+              <div>
+                <div class="confirma-nombre" style="font-size:14px">${e.pregunta}</div>
+                <div class="confirma-puesto" style="text-transform:none;letter-spacing:normal;margin-top:6px">Tu respuesta: ${e.respuestaUsuario || '(no respondida)'}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
   function mostrarResultado(r) {
     const notaTiempo = r.seAgotoElTiempo ? '<p class="resultado-sub" style="margin-top:10px;font-style:italic">Se acabó el tiempo antes de terminar el examen.</p>' : '';
+    const notaPuntoExtra = r.puntoExtraAplicado ? '<p class="resultado-sub" style="margin-top:10px">Se aplicó tu punto extra de la capacitación a esta calificación.</p>' : '';
+    const notaErrores = erroresHTML(r.errores);
 
     if (r.aprobado && r.constanciaPendiente) {
       actualizarRielInfo('Aprobado — constancia pendiente');
@@ -629,10 +657,12 @@
           ${anilloHTML(r.aciertos, r.total, 'ambar')}
           <div class="resultado-titulo">Aprobaste</div>
           <p class="resultado-sub">Tu resultado ya quedó registrado, pero la constancia no se pudo generar en automático. Contacta al oficial de cumplimiento o intenta descargarla más tarde.</p>
+          ${notaPuntoExtra}
           <div class="resultado-acciones">
             <button class="btn btn-pri" onclick="descargarConstanciaExistente()">Reintentar descarga</button>
           </div>
-        </div>`;
+        </div>
+        ${notaErrores}`;
       animarAnillo(r.aciertos, r.total);
     } else if (r.aprobado) {
       actualizarRielInfo('Examen aprobado');
@@ -644,6 +674,7 @@
           ${anilloHTML(r.aciertos, r.total, 'libre')}
           <div class="resultado-titulo">¡Felicidades, aprobaste!</div>
           <p class="resultado-sub">Completaste con éxito tu Capacitación Anual PLD-FT. Tu constancia ya está lista — descárgala y consérvala en tu expediente personal.</p>
+          ${notaPuntoExtra}
           <div class="resultado-acciones">
             <button class="btn btn-pri" onclick="descargarPdf('${r.pdfBase64}', '${r.folio}')">
               <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>
@@ -651,7 +682,8 @@
             </button>
             <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
           </div>
-        </div>`;
+        </div>
+        ${notaErrores}`;
       animarAnillo(r.aciertos, r.total);
     } else if (r.bloqueado) {
       actualizarRielInfo('Intentos agotados');
@@ -662,8 +694,10 @@
           <div class="resultado-titulo">Intentos agotados</div>
           <p class="resultado-sub">Alcanzaste el máximo de intentos permitidos.</p>
           ${notaTiempo}
+          ${notaPuntoExtra}
           <p class="resultado-sub" style="margin-top:18px">Contacta al oficial de cumplimiento: <strong>${r.correoOficial}</strong></p>
-        </div>`;
+        </div>
+        ${notaErrores}`;
       animarAnillo(r.aciertos, r.total);
     } else {
       actualizarRielInfo('No aprobado');
@@ -674,13 +708,15 @@
           <div class="resultado-titulo">No aprobaste esta vez</div>
           <p class="resultado-sub">Te quedan ${r.intentosRestantes} intento(s) para la Capacitación Anual PLD-FT.</p>
           ${notaTiempo}
+          ${notaPuntoExtra}
           <div class="resultado-acciones">
             <button class="btn btn-pri" onclick="intentarDeNuevo()">
               <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 17v-5h5"/></svg>
               Intentar de nuevo
             </button>
           </div>
-        </div>`;
+        </div>
+        ${notaErrores}`;
       animarAnillo(r.aciertos, r.total);
     }
   }
