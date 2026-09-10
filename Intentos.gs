@@ -19,21 +19,31 @@ function obtenerEstadoUsuario(correo) {
   let intentos = 0;
   let aprobado = false;
   let mejorCalificacion = '';
+  let respuestasAprobado = null;
 
   for (let i = 1; i < datos.length; i++) {
-    const [, correoFila, campanaId, , , , calificacion, aprobadoFila] = datos[i];
+    const [, correoFila, campanaId, , , respuestasJSON, calificacion, aprobadoFila] = datos[i];
     if (String(correoFila).toLowerCase() === correo.toLowerCase() && campanaId === config.campanaId) {
       intentos++;
       const esteAprobado = aprobadoFila === true || String(aprobadoFila).toUpperCase() === 'TRUE';
       if (esteAprobado) {
         aprobado = true;
         mejorCalificacion = calificacion;
+        respuestasAprobado = respuestasJSON;
       }
     }
   }
 
   if (aprobado) {
-    return { estado: 'APROBADO', config, mejorCalificacion };
+    let errores = [];
+    try {
+      if (respuestasAprobado) {
+        errores = calificarExamen(JSON.parse(respuestasAprobado), correo).errores;
+      }
+    } catch (e) {
+      errores = []; // si algo del formato guardado no cuadra, mejor no mostrar nada a mostrar un dato erróneo
+    }
+    return { estado: 'APROBADO', config, mejorCalificacion, errores };
   }
   if (intentos >= config.maxIntentos) {
     return { estado: 'BLOQUEADO_INTENTOS', config, intentos };
@@ -46,7 +56,7 @@ function obtenerEstadoUsuario(correo) {
   };
 }
 
-function registrarIntento(correo, preguntaIds, respuestas, calificacion, aprobado, cambiosFoco) {
+function registrarIntento(correo, preguntaIds, respuestas, calificacion, aprobado, cambiosFoco, aciertosCrudos, puntoExtraAplicado) {
   const config = obtenerConfig();
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -62,7 +72,9 @@ function registrarIntento(correo, preguntaIds, respuestas, calificacion, aprobad
       JSON.stringify(respuestas),
       calificacion,
       aprobado,
-      cambiosFoco || 0
+      cambiosFoco || 0,
+      aciertosCrudos != null ? aciertosCrudos : calificacion,
+      puntoExtraAplicado || 0
     ]);
     return numIntentoActual;
   } finally {
