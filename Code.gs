@@ -35,7 +35,7 @@ function iniciar() {
     };
   }
   if (estado.estado === 'APROBADO') {
-    return { pantalla: 'APROBADO', nombre: usuario.nombre, calificacion: estado.mejorCalificacion, total: config.numPreguntasExamen };
+    return { pantalla: 'APROBADO', nombre: usuario.nombre, calificacion: estado.mejorCalificacion, total: config.numPreguntasExamen, errores: estado.errores };
   }
   if (estado.estado === 'BLOQUEADO_INTENTOS') {
     return { pantalla: 'BLOQUEADO', correoOficial: config.correoOficialCumplimiento };
@@ -68,7 +68,8 @@ function iniciar() {
     maxIntentos: config.maxIntentos,
     numPreguntas: config.numPreguntasExamen,
     duracionMinutos: config.duracionExamenMinutos,
-    puntajeMinimo: config.puntajeMinimo
+    puntajeMinimo: config.puntajeMinimo,
+    puntoExtra: usuario.puntoExtra
   };
 }
 
@@ -149,23 +150,31 @@ function verificarSesion() {
 function finalizarSesion(usuario, preguntaIds, respuestasObj, config, cambiosFoco) {
   const respuestas = preguntaIds.map(id => ({ id, opcionElegida: respuestasObj[id] || null }));
   const resultado = calificarExamen(respuestas, usuario.correo);
-  const aprobado = resultado.aciertos >= config.puntajeMinimo;
 
-  const numIntento = registrarIntento(usuario.correo, preguntaIds, respuestas, resultado.aciertos, aprobado, cambiosFoco || 0);
+  // El punto extra (columna PuntoExtra en ColaboradoresAutorizados) se suma
+  // aquí, antes de evaluar aprobación — nunca puede llevar el puntaje por
+  // encima del total de preguntas del examen.
+  const puntoExtraAplicado = usuario.puntoExtra ? 1 : 0;
+  const aciertosFinales = Math.min(resultado.total, resultado.aciertos + puntoExtraAplicado);
+  const aprobado = aciertosFinales >= config.puntajeMinimo;
+
+  const numIntento = registrarIntento(usuario.correo, preguntaIds, respuestas, aciertosFinales, aprobado, cambiosFoco || 0, resultado.aciertos, puntoExtraAplicado);
   eliminarSesion(usuario.correo, config.campanaId);
 
   const salida = {
     terminado: true,
-    aciertos: resultado.aciertos,
+    aciertos: aciertosFinales,
     total: resultado.total,
     aprobado,
     numIntento,
-    intentosRestantes: Math.max(0, config.maxIntentos - numIntento)
+    intentosRestantes: Math.max(0, config.maxIntentos - numIntento),
+    puntoExtraAplicado: !!puntoExtraAplicado,
+    errores: resultado.errores
   };
 
   if (aprobado) {
     try {
-      const constancia = generarConstancia(usuario.correo, usuario.nombre, usuario.puesto, resultado.aciertos, resultado.total);
+      const constancia = generarConstancia(usuario.correo, usuario.nombre, usuario.puesto, aciertosFinales, resultado.total);
       salida.pdfBase64 = constancia.pdfBase64;
       salida.folio = constancia.folio;
     } catch (e) {
