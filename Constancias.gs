@@ -5,6 +5,44 @@
  * de auditoría antes de entregarla al colaborador.
  */
 
+/** Mapa de dominio de correo -> plantilla de Slides de esa empresa.
+    Las tres empresas del grupo tienen su propio diseño (logo, nombre,
+    certificaciones propias), aunque comparten el mismo oficial de
+    cumplimiento como firmante. */
+function obtenerMapaTemplates(config) {
+  return {
+    'cualli.mx': { id: config.templateSlidesIdCualli, clave: 'TEMPLATE_SLIDES_ID_CUALLI' },
+    'fractio.mx': { id: config.templateSlidesIdFractio, clave: 'TEMPLATE_SLIDES_ID_FRACTIO' },
+    'hipoo.mx': { id: config.templateSlidesIdHipoo, clave: 'TEMPLATE_SLIDES_ID_HIPOO' }
+  };
+}
+
+/** Decide qué plantilla de Slides usar. Primero resuelve el caso especial
+    de los asociados de Cualli sin puesto (mismo dominio @cualli.mx, pero
+    con una plantilla propia que no lleva el marcador {{PUESTO}}); ese caso
+    se detecta por el campo Puesto vacío en el roster, no por el dominio.
+    Para el resto, aplica el mapa dominio -> plantilla de siempre. */
+function seleccionarTemplateId(correo, puesto, config) {
+  const dominio = (String(correo).split('@')[1] || '').trim().toLowerCase();
+
+  if (dominio === 'cualli.mx' && !String(puesto || '').trim()) {
+    if (!config.templateSlidesIdCualliAsociados) {
+      throw new Error('Falta configurar TEMPLATE_SLIDES_ID_CUALLI_ASOCIADOS en la hoja Config.');
+    }
+    return config.templateSlidesIdCualliAsociados;
+  }
+
+  const mapa = obtenerMapaTemplates(config);
+  const entrada = mapa[dominio];
+  if (!entrada) {
+    throw new Error(`No hay plantilla de constancia configurada para el dominio "${dominio}".`);
+  }
+  if (!entrada.id) {
+    throw new Error(`Falta configurar ${entrada.clave} en la hoja Config.`);
+  }
+  return entrada.id;
+}
+
 function generarConstancia(correo, nombre, puesto, calificacion, total) {
   const config = obtenerConfig();
   const esPrueba = String(config.campanaId).toUpperCase().includes('PRUEBA');
@@ -19,10 +57,8 @@ function generarConstancia(correo, nombre, puesto, calificacion, total) {
     // que alguien confunda esto con una constancia real de PLD/FT.
     pdfBlob = generarPdfDePrueba(nombre, folio, calificacion, total);
   } else {
-    if (!config.templateSlidesId) {
-      throw new Error('Falta configurar TEMPLATE_SLIDES_ID en la hoja Config.');
-    }
-    const plantilla = DriveApp.getFileById(config.templateSlidesId);
+    const templateId = seleccionarTemplateId(correo, puesto, config);
+    const plantilla = DriveApp.getFileById(templateId);
     // makeCopy() sin carpeta destino falla cuando el archivo de origen vive en
     // una Unidad compartida — por eso siempre se indica una carpeta explícita.
     const carpetaDestino = config.carpetaConstanciasId
