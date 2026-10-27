@@ -7,13 +7,8 @@
   let temporizadorTick = null;
   let temporizadorSync = null;
   let examenEnCurso = false;
-  const inicioCarga = Date.now();
-  const ESPERA_MIN_SPLASH = 900;
+  const ESPERA_SPLASH_CON_NOMBRE = 2000; // ms que se ve el splash YA con el nombre, sin importar cuánto tardó la carga
 
-  // Bloqueo de copiar/clic derecho mientras el examen está activo — evita
-  // vaciar las preguntas hacia otra herramienta con un copiar/pegar casual.
-  // No incluye detección de cambio de pestaña: los compañeros pueden estar
-  // atendiendo otro pendiente en paralelo, y eso no debe registrarse.
   document.addEventListener('contextmenu', (e) => { if (examenEnCurso) e.preventDefault(); });
   document.addEventListener('copy', (e) => { if (examenEnCurso) e.preventDefault(); });
   document.addEventListener('cut', (e) => { if (examenEnCurso) e.preventDefault(); });
@@ -26,14 +21,6 @@
     setTimeout(() => llamarServidor('iniciar', [], alTerminarCarga), espera);
   });
 
-  /**
-   * Envoltura para google.script.run con recuperación automática: si el
-   * servidor no responde en el tiempo esperado (puede pasar aunque la
-   * operación sí se haya completado del lado del servidor — es la
-   * comunicación de regreso la que a veces falla), se vuelve a consultar
-   * iniciar() para reencontrar el estado real en vez de dejar a la persona
-   * viendo un spinner para siempre.
-   */
   function llamarServidor(nombreFuncion, args, exito, timeoutMs) {
     let resuelto = false;
     const recuperar = setTimeout(() => {
@@ -49,11 +36,11 @@
   }
 
   function alTerminarCarga(datos) {
-    const faltante = ESPERA_MIN_SPLASH - (Date.now() - inicioCarga);
+    if (datos.nombre) actualizarIdentidad(datos.nombre, datos.puesto || '');
     setTimeout(() => {
       document.getElementById('splash').classList.add('fuera');
       renderizar(datos);
-    }, Math.max(0, faltante));
+    }, ESPERA_SPLASH_CON_NOMBRE);
   }
 
   function iniciales(nombre) {
@@ -95,7 +82,7 @@
     // medias. Solo esta lista corta, de errores de negocio genuinos que
     // nosotros mismos lanzamos, se muestra tal cual porque reintentar no
     // cambiaría nada.
-    const esPermanente = /no autorizado|no está en el roster|no es posible iniciar|ya tienes un examen en curso|no se encontró una constancia|falta configurar/i.test(mensaje);
+    const esPermanente = /no autorizado|no está en el roster|no es posible iniciar|ya tienes un examen en curso|no se encontró una constancia|no se pudo recuperar el archivo|falta configurar|no hay preguntas configuradas/i.test(mensaje);
 
     if (!esPermanente) {
       detenerTemporizador();
@@ -123,10 +110,21 @@
       iniciarTemporizador(datos.segundosRestantes);
       return;
     }
+    if (datos.pantalla === 'INSTRUCCIONES_PENDIENTES') {
+      // Había un examen preparado pero nunca confirmado (ej. se refrescó la
+      // página en instrucciones) — se reconstruye lo necesario para que
+      // "Comenzar mi examen" funcione igual que si nunca se hubiera ido.
+      actualizarIdentidad(datos.nombre, datos.puesto);
+      resultadoExamenPendiente = { pregunta: datos.pregunta, progreso: datos.progreso, segundosRestantes: datos.segundosRestantes };
+      mostrarInstrucciones(datos);
+      habilitarBotonInstrucciones();
+      return;
+    }
     const pantallas = {
       NO_AUTORIZADO: pantallaNoAutorizado,
       FUERA_DE_VENTANA: pantallaFueraDeVentana,
       APROBADO: pantallaAprobado,
+      APROBADO_CON_REINTENTO: pantallaAprobadoConReintento,
       BLOQUEADO: pantallaBloqueado,
       SELECCION_EXAMEN: pantallaSeleccion
     };
@@ -183,6 +181,28 @@
       ${erroresHTML(d.errores)}`;
   }
 
+  function pantallaAprobadoConReintento(d) {
+    datosSeleccion = d;
+    actualizarIdentidad(d.nombre, d.puesto);
+    actualizarRielInfo('Ya aprobaste — puedes intentar mejorar');
+    actualizarVigencia('verde', 'Aprobado');
+    setTimeout(() => animarAnillo(d.calificacion, d.total), 30);
+    return `
+      <div class="resultado-hero libre">
+        ${confetiEsquinaHTML('libre')}
+        ${anilloHTML(d.calificacion, d.total, 'libre')}
+        <div class="resultado-titulo">¡Ya aprobaste!</div>
+        <p class="resultado-sub">${d.nombre.split(' ')[0]}, tu Capacitación Anual PLD-FT ya quedó acreditada con ${d.calificacion}/${d.total}. Todavía te queda ${d.intentosRestantes} intento(s) disponible(s) — puedes descargar tu constancia y terminar aquí, o usarlo para tratar de mejorar tu calificación.</p>
+        <div class="resultado-acciones">
+          <button class="btn btn-pri" onclick="descargarConstanciaExistente()">Descargar constancia</button>
+          <button class="btn btn-dorado" onclick="confirmarIdentidad()">Intentar mejorar calificación</button>
+          <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
+        </div>
+        <p class="campo-ayuda" style="margin-top:14px">Si tu nuevo resultado es igual o mejor, reemplaza tu constancia actual. Si sale más bajo, tu aprobación y tu constancia de ahora no cambian.</p>
+      </div>
+      ${erroresHTML(d.errores)}`;
+  }
+
   function pantallaBloqueado(d) {
     actualizarRielInfo('Sin intentos disponibles');
     actualizarVigencia('rojo', 'Bloqueado');
@@ -203,7 +223,7 @@
       <header class="cabecera panel-cab">
         <div class="cab-txt">
           <div class="cab-ante"><span class="cab-rombo"></span>Prevención de Lavado de Dinero y Financiamiento al Terrorismo</div>
-          <h1>Capacitación Anual<br>PLD/FT</h1>
+          <h1>Capacitación Anual<br>PLD/FT ${d.anio}</h1>
           <span class="cab-hilo"></span>
           <p>Examen de opción múltiple. Las preguntas se presentan una a la vez y, una vez
              que inicies, el reloj de ${d.duracionMinutos} minutos no se detiene.</p>
@@ -238,7 +258,7 @@
           <div class="resumen-texto"><b>${d.puntajeMinimo}</b><span>Mínimo para aprobar</span></div>
         </div>
         ${d.puntoExtra ? `
-        <div class="resumen-item">
+        <div class="resumen-item resumen-item--extra">
           <div class="resumen-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></div>
           <div class="resumen-texto"><b>+1</b><span>Punto extra de la capacitación</span></div>
         </div>` : ''}
@@ -322,7 +342,7 @@
           </div>
           <div class="intro-hero__texto">
             <span class="intro-hero__num">${d.duracionMinutos}<small>min</small></span>
-            <p>El reloj corre en cuanto le des clic a "Comenzar mi examen" y no se detiene — incluso si cierras la pestaña por accidente. El examen sigue corriendo del lado del servidor, no en tu navegador.</p>
+            <p>El reloj arranca justo al darle clic a "Comenzar mi examen", y no se detiene — incluso si cierras la pestaña por accidente. El examen sigue corriendo del lado del servidor, no en tu navegador.</p>
           </div>
         </div>
 
@@ -355,11 +375,25 @@
             <span class="intro-confirmacion__k">Confirmación</span>
             <p class="intro-confirmacion__pregunta">¿Listo para comenzar tu examen ahora?</p>
           </div>
-          <button class="btn btn-dorado" id="btnComenzarExamen" disabled onclick="comenzarExamenDesdeInstrucciones()">
-            <span id="txtBtnComenzar">Preparando…</span>
-          </button>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-borde" onclick="cancelarInstrucciones()">Regresar</button>
+            <button class="btn btn-dorado" id="btnComenzarExamen" disabled onclick="comenzarExamenDesdeInstrucciones()">
+              <span id="txtBtnComenzar">Preparando…</span>
+            </button>
+          </div>
         </div>
       </div>`;
+  }
+
+  /** Cancela el examen preparado (todavía sin confirmar) y regresa a la
+      pantalla principal — por ejemplo, si la persona nota que su Nombre o
+      Puesto están mal. No cuenta como intento usado. */
+  function cancelarInstrucciones() {
+    resultadoExamenPendiente = null;
+    document.getElementById('app').innerHTML = pantallaCargando('Regresando…');
+    llamarServidor('cancelarInicioExamenCliente', [], () => {
+      llamarServidor('iniciar', [], renderizar);
+    });
   }
 
   function habilitarBotonInstrucciones() {
@@ -373,8 +407,12 @@
     if (!resultadoExamenPendiente) return;
     const r = resultadoExamenPendiente;
     resultadoExamenPendiente = null;
-    renderPregunta(r.pregunta, r.progreso, r.segundosRestantes);
-    iniciarTemporizador(r.segundosRestantes);
+    const btn = document.getElementById('btnComenzarExamen');
+    if (btn) { btn.disabled = true; document.getElementById('txtBtnComenzar').textContent = 'Comenzando…'; }
+    llamarServidor('confirmarInicioExamenCliente', [], () => {
+      renderPregunta(r.pregunta, r.progreso, r.segundosRestantes);
+      iniciarTemporizador(r.segundosRestantes);
+    });
   }
 
   function renderPregunta(pregunta, progreso, segundosIniciales) {
@@ -644,8 +682,37 @@
 
   function mostrarResultado(r) {
     const notaTiempo = r.seAgotoElTiempo ? '<p class="resultado-sub" style="margin-top:10px;font-style:italic">Se acabó el tiempo antes de terminar el examen.</p>' : '';
-    const notaPuntoExtra = r.puntoExtraAplicado ? '<p class="resultado-sub" style="margin-top:10px">Se aplicó tu punto extra de la capacitación a esta calificación.</p>' : '';
+    const notaPuntoExtra = r.puntoExtraAplicado
+      ? `<p class="resultado-sub" style="margin-top:12px"><span class="badge-punto-extra"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Punto extra de la capacitación aplicado</span></p>`
+      : '';
     const notaErrores = erroresHTML(r.errores);
+
+    if (r.yaEstabaAprobado && r.constanciaSinCambios) {
+      // Ya venía aprobado y usó su intento extra para tratar de mejorar,
+      // pero no lo logró (o de plano no alcanzó el mínimo esta vez). Su
+      // aprobación y su constancia de antes siguen exactamente igual.
+      actualizarRielInfo('Ya presentaste tu examen');
+      actualizarVigencia('verde', 'Aprobado');
+      document.getElementById('app').innerHTML = `
+        <div class="resultado-hero ambar">
+          ${anilloHTML(r.aciertos, r.total, 'ambar')}
+          <div class="resultado-titulo">No superaste tu mejor calificación</div>
+          <p class="resultado-sub">Este intento no mejoró tu resultado anterior. Tranquilo — tu aprobación y tu constancia vigente no cambiaron en nada.</p>
+          ${notaPuntoExtra}
+          <div class="resultado-acciones">
+            <button class="btn btn-pri" onclick="descargarConstanciaExistente()">Descargar mi constancia</button>
+            <button class="btn btn-borde" onclick="finalizarSesionUsuario()">Finalizar y cerrar</button>
+          </div>
+        </div>
+        ${notaErrores}`;
+      animarAnillo(r.aciertos, r.total);
+      return;
+    }
+
+    const tituloAprobado = r.mejoro ? '¡Mejoraste tu calificación!' : '¡Felicidades, aprobaste!';
+    const subAprobado = r.mejoro
+      ? 'Tu nueva calificación reemplazó tu constancia anterior — descarga la actualizada y consérvala en tu expediente.'
+      : 'Completaste con éxito tu Capacitación Anual PLD-FT. Tu constancia ya está lista — descárgala y consérvala en tu expediente personal.';
 
     if (r.aprobado && r.constanciaPendiente) {
       actualizarRielInfo('Aprobado — constancia pendiente');
@@ -672,8 +739,8 @@
         <div class="resultado-hero libre">
           ${confetiEsquinaHTML('libre')}
           ${anilloHTML(r.aciertos, r.total, 'libre')}
-          <div class="resultado-titulo">¡Felicidades, aprobaste!</div>
-          <p class="resultado-sub">Completaste con éxito tu Capacitación Anual PLD-FT. Tu constancia ya está lista — descárgala y consérvala en tu expediente personal.</p>
+          <div class="resultado-titulo">${tituloAprobado}</div>
+          <p class="resultado-sub">${subAprobado}</p>
           ${notaPuntoExtra}
           <div class="resultado-acciones">
             <button class="btn btn-pri" onclick="descargarPdf('${r.pdfBase64}', '${r.folio}')">
