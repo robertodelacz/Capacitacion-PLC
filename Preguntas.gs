@@ -1,17 +1,4 @@
-/**
- * Preguntas.gs
- * Selección aleatoria y calificación del examen. La respuesta correcta
- * NUNCA se envía al cliente antes de calificar — todo ocurre en el servidor
- * para que no pueda leerse desde el código fuente del navegador.
- *
- * Además, el orden de las opciones (A/B/C/D) se mezcla de forma distinta
- * para cada colaborador en cada pregunta — así, si dos personas reciben por
- * coincidencia la misma pregunta, la respuesta correcta no está en la misma
- * letra para ambas, y un "¡es la C!" en voz alta deja de servir. La mezcla
- * es determinista (misma persona + misma pregunta = mismo orden siempre),
- * así que si alguien recarga la página no le cambian las opciones a media
- * respuesta.
- */
+
 
 function elegirPreguntasParaSesion(numPreguntas) {
   const hoja = SpreadsheetApp.getActive().getSheetByName(SHEET_BANCO_PREGUNTAS);
