@@ -1,10 +1,4 @@
-/**
- * Sesiones.gs
- * Controla el examen "en curso": qué preguntas le tocaron a este intento,
- * en qué pregunta va, qué ha contestado, y desde cuándo corre el reloj.
- * El límite de tiempo se valida siempre aquí, en el servidor — el contador
- * que ve el colaborador en pantalla es solo referencia visual.
- */
+
 
 function obtenerSesionActiva(correo, campanaId) {
   const hoja = SpreadsheetApp.getActive().getSheetByName(SHEET_SESIONES);
@@ -18,8 +12,9 @@ function obtenerSesionActiva(correo, campanaId) {
         preguntaIds: String(fila[2]).split(','),
         respuestas: JSON.parse(fila[3] || '{}'),
         indiceActual: Number(fila[4]),
-        inicio: new Date(fila[5]),
-        cambiosFoco: Number(fila[6]) || 0
+        inicio: fila[5] ? new Date(fila[5]) : null,
+        cambiosFoco: Number(fila[6]) || 0,
+        confirmada: fila[7] === true || String(fila[7]).toUpperCase() === 'TRUE'
       };
     }
   }
@@ -34,7 +29,46 @@ function crearSesion(correo, campanaId, preguntaIds) {
       throw new Error('Ya tienes un examen en curso — recarga la página para continuarlo.');
     }
     const hoja = SpreadsheetApp.getActive().getSheetByName(SHEET_SESIONES);
-    hoja.appendRow([correo, campanaId, preguntaIds.join(','), '{}', 0, new Date(), 0]);
+    hoja.appendRow([correo, campanaId, preguntaIds.join(','), '{}', 0, '', 0, false]);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function confirmarInicioExamen(correo, campanaId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const hoja = SpreadsheetApp.getActive().getSheetByName(SHEET_SESIONES);
+    const datos = hoja.getDataRange().getValues();
+    for (let i = 1; i < datos.length; i++) {
+      if (String(datos[i][0]).toLowerCase() === correo.toLowerCase() && datos[i][1] === campanaId) {
+        hoja.getRange(i + 1, 6, 1, 1).setValue(new Date()); // columna F: inicio
+        hoja.getRange(i + 1, 8, 1, 1).setValue(true); // columna H: confirmada
+        return true;
+      }
+    }
+    return false;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function cancelarSesionNoConfirmada(correo, campanaId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const hoja = SpreadsheetApp.getActive().getSheetByName(SHEET_SESIONES);
+    const datos = hoja.getDataRange().getValues();
+    for (let i = datos.length - 1; i >= 1; i--) {
+      if (String(datos[i][0]).toLowerCase() === correo.toLowerCase() && datos[i][1] === campanaId) {
+        const confirmada = datos[i][7] === true || String(datos[i][7]).toUpperCase() === 'TRUE';
+        if (confirmada) return false;
+        hoja.deleteRow(i + 1);
+        return true;
+      }
+    }
+    return false;
   } finally {
     lock.releaseLock();
   }
@@ -59,12 +93,21 @@ function actualizarSesion(correo, campanaId, respuestas, indiceActual, cambiosFo
 }
 
 function eliminarSesion(correo, campanaId) {
-  const hoja = SpreadsheetApp.getActive().getSheetByName(SHEET_SESIONES);
-  const datos = hoja.getDataRange().getValues();
-  for (let i = datos.length - 1; i >= 1; i--) {
-    if (String(datos[i][0]).toLowerCase() === correo.toLowerCase() && datos[i][1] === campanaId) {
-      hoja.deleteRow(i + 1);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const hoja = SpreadsheetApp.getActive().getSheetByName(SHEET_SESIONES);
+    const datos = hoja.getDataRange().getValues();
+    let eliminada = false;
+    for (let i = datos.length - 1; i >= 1; i--) {
+      if (String(datos[i][0]).toLowerCase() === correo.toLowerCase() && datos[i][1] === campanaId) {
+        hoja.deleteRow(i + 1);
+        eliminada = true;
+      }
     }
+    return eliminada;
+  } finally {
+    lock.releaseLock();
   }
 }
 
