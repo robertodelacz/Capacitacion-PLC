@@ -1,9 +1,4 @@
-/**
- * Config.gs
- * Lee la hoja "Config" (columnas: Clave | Valor) y expone las constantes
- * del sistema. Ajusta los valores directamente en la hoja de cálculo,
- * nunca aquí en el código.
- */
+
 
 const SHEET_CONFIG = 'Config';
 const SHEET_COLABORADORES = 'ColaboradoresAutorizados';
@@ -21,11 +16,11 @@ function obtenerConfig() {
     if (clave) config[clave] = datos[i][1];
   }
   return {
-    campanaId: config['CAMPANA_ID'] || 'CAMPANA-2026-TEST',
+    campanaId: config['CAMPANA_ID'] || 'CAMPANA-2026-EXAMEN CORRECTO',
     ventanaInicio: new Date(config['VENTANA_INICIO']),
     ventanaFin: new Date(config['VENTANA_FIN']),
-    numPreguntasExamen: Number(config['NUM_PREGUNTAS_EXAMEN']) || 12,
-    puntajeMinimo: Number(config['PUNTAJE_MINIMO']) || 9,
+    numPreguntasExamen: Number(config['NUM_PREGUNTAS_EXAMEN']) || 10,
+    puntajeMinimo: Number(config['PUNTAJE_MINIMO']) || 8,
     maxIntentos: Number(config['MAX_INTENTOS']) || 2,
     duracionExamenMinutos: Number(config['DURACION_EXAMEN_MINUTOS']) || 30,
     correoOficialCumplimiento: config['CORREO_OFICIAL_CUMPLIMIENTO'] || '',
