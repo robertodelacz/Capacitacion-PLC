@@ -6,26 +6,32 @@
  */
 
 /** Mapa de dominio de correo -> plantilla de Slides de esa empresa.
-    Las tres empresas del grupo tienen su propio diseño (logo, nombre,
-    certificaciones propias), aunque comparten el mismo oficial de
-    cumplimiento como firmante. */
+    @cualli.mx y @weiji.mx comparten la misma plantilla (Weiji está ligada
+    a la constancia de Cualli); Fractio y Hipoo tienen la suya propia.
+    Todas comparten el mismo oficial de cumplimiento como firmante. */
 function obtenerMapaTemplates(config) {
+  const cualli = { id: config.templateSlidesIdCualli, clave: 'TEMPLATE_SLIDES_ID_CUALLI' };
   return {
-    'cualli.mx': { id: config.templateSlidesIdCualli, clave: 'TEMPLATE_SLIDES_ID_CUALLI' },
+    'cualli.mx': cualli,
+    'weiji.mx': cualli,
     'fractio.mx': { id: config.templateSlidesIdFractio, clave: 'TEMPLATE_SLIDES_ID_FRACTIO' },
     'hipoo.mx': { id: config.templateSlidesIdHipoo, clave: 'TEMPLATE_SLIDES_ID_HIPOO' }
   };
 }
 
+// Dominios que usan la plantilla de Cualli (incluye el caso de asociados
+// sin puesto, que no lleva el marcador {{PUESTO}}).
+const DOMINIOS_PLANTILLA_CUALLI = ['cualli.mx', 'weiji.mx'];
+
 /** Decide qué plantilla de Slides usar. Primero resuelve el caso especial
-    de los asociados de Cualli sin puesto (mismo dominio @cualli.mx, pero
+    de los asociados sin puesto (mismo dominio @cualli.mx o @weiji.mx, pero
     con una plantilla propia que no lleva el marcador {{PUESTO}}); ese caso
     se detecta por el campo Puesto vacío en el roster, no por el dominio.
     Para el resto, aplica el mapa dominio -> plantilla de siempre. */
 function seleccionarTemplateId(correo, puesto, config) {
   const dominio = (String(correo).split('@')[1] || '').trim().toLowerCase();
 
-  if (dominio === 'cualli.mx' && !String(puesto || '').trim()) {
+  if (DOMINIOS_PLANTILLA_CUALLI.includes(dominio) && !String(puesto || '').trim()) {
     if (!config.templateSlidesIdCualliAsociados) {
       throw new Error('Falta configurar TEMPLATE_SLIDES_ID_CUALLI_ASOCIADOS en la hoja Config.');
     }
@@ -43,7 +49,7 @@ function seleccionarTemplateId(correo, puesto, config) {
   return entrada.id;
 }
 
-function generarConstancia(correo, nombre, puesto, calificacion, total) {
+function generarConstancia(correo, nombre, puesto, calificacion, total, fechaOriginal) {
   const config = obtenerConfig();
   const esPrueba = String(config.campanaId).toUpperCase().includes('PRUEBA');
 
@@ -67,7 +73,7 @@ function generarConstancia(correo, nombre, puesto, calificacion, total) {
     const copia = plantilla.makeCopy(`Constancia PLD-FT - ${nombre} - ${folio}`, carpetaDestino);
     const presentacion = SlidesApp.openById(copia.getId());
 
-    const fecha = formatearFechaCertificado(new Date());
+    const fecha = formatearFechaCertificado(fechaOriginal || new Date());
     presentacion.getSlides().forEach(slide => {
       slide.replaceAllText('{{NOMBRE}}', nombre);
       slide.replaceAllText('{{PUESTO}}', puesto || '');
@@ -97,6 +103,7 @@ function generarConstancia(correo, nombre, puesto, calificacion, total) {
 
   return {
     folio,
+    pdfFileId: pdfFile.getId(),
     pdfBase64: Utilities.base64Encode(pdfBlob.getBytes())
   };
 }
@@ -187,6 +194,30 @@ function obtenerConstanciaMasReciente(correo) {
   }
 
   if (!ultima) throw new Error('No se encontró una constancia emitida para este correo en esta campaña.');
-  const pdfBlob = DriveApp.getFileById(ultima.pdfFileId).getBlob();
+  let pdfBlob;
+  try {
+    pdfBlob = DriveApp.getFileById(ultima.pdfFileId).getBlob();
+  } catch (e) {
+    throw new Error('No se pudo recuperar el archivo de tu constancia. Contacta al oficial de cumplimiento.');
+  }
   return { folio: ultima.folio, pdfBase64: Utilities.base64Encode(pdfBlob.getBytes()) };
+}
+
+/** Igual que obtenerConstanciaMasReciente, pero regresa null en vez de
+    lanzar error si no hay nada, y no descarga el PDF — solo el folio y el
+    ID del archivo. Se usa para encontrar y borrar la constancia anterior
+    cuando un reintento de mejora genera una nueva. */
+function obtenerConstanciaMasRecienteSilenciosa(correo) {
+  const config = obtenerConfig();
+  const hoja = SpreadsheetApp.getActive().getSheetByName(SHEET_CONSTANCIAS);
+  const datos = hoja.getDataRange().getValues();
+  let ultima = null;
+
+  for (let i = 1; i < datos.length; i++) {
+    const [correoFila, campanaId, folio, , , pdfFileId] = datos[i];
+    if (String(correoFila).toLowerCase() === correo.toLowerCase() && campanaId === config.campanaId) {
+      ultima = { folio, pdfFileId };
+    }
+  }
+  return ultima;
 }
