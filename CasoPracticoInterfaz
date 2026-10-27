@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base target="_top">
+  <link rel="icon" type="image/png"
+        href="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png">
+  <link rel="shortcut icon" type="image/png"
+        href="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png">
+  <link rel="apple-touch-icon"
+        href="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png">
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
+
+<!-- ================= SPLASH ================= -->
+<div id="splash">
+  <div class="sp">
+    <div class="sp-placa">
+      <img class="sp-logo" src="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png"
+           alt="Financiera Cualli" onerror="this.style.display='none'">
+    </div>
+    <div class="sp-regla"></div>
+    <div class="sp-sis"><svg class="rayo-marca rayo-marca--md" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L3 14L12 14L11 22L21 10L12 10Z"/></svg><span>Impulso Cualli</span></div>
+    <div class="sp-bien">
+      <div class="sp-hola">Caso Práctico · Entrevista técnica</div>
+      <div class="sp-nom">Ejecutivo de Mesa de Control</div>
+      <div class="sp-rol">Contraloría Operativa · Financiera Cualli</div>
+    </div>
+    <svg class="sp-aro" viewBox="0 0 26 26">
+      <circle class="p" cx="13" cy="13" r="10.5"/>
+      <circle class="a" cx="13" cy="13" r="10.5"/>
+    </svg>
+  </div>
+</div>
+
+<!-- ================= ACCESO (login) ================= -->
+<div id="accesoCp" class="acceso-cp">
+  <div class="acceso-cp__card">
+    <div class="acceso-cp__marca">
+      <svg class="rayo-marca rayo-marca--md" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L3 14L12 14L11 22L21 10L12 10Z"/></svg>
+      <span>Impulso Cualli</span>
+    </div>
+    <h1 class="acceso-cp__t">Caso Práctico · Acceso</h1>
+    <p class="acceso-cp__sub">Escribe el correo al que te invitamos a este proceso — te enviamos un código de acceso de un solo uso.</p>
+
+    <div id="accesoCpPasoCorreo">
+      <div class="grupo-cp">
+        <label class="grupo-cp__etq" for="accesoCorreo">Correo electrónico</label>
+        <input class="campo-cp" type="email" id="accesoCorreo" placeholder="tucorreo@ejemplo.com" autocomplete="email" inputmode="email">
+      </div>
+      <button class="btn btn-pri acceso-cp__btn" id="btnPedirCodigo" type="button" onclick="pedirCodigoAccesoCP()">Enviar código</button>
+    </div>
+
+    <div id="accesoCpPasoCodigo" style="display:none">
+      <div class="grupo-cp">
+        <label class="grupo-cp__etq" for="accesoCodigo">Código de 6 dígitos</label>
+        <input class="campo-cp" type="text" id="accesoCodigo" placeholder="000000" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+      </div>
+      <button class="btn btn-pri acceso-cp__btn" id="btnVerificarCodigo" type="button" onclick="verificarCodigoAccesoClienteCP()">Verificar</button>
+      <button class="btn btn-borde acceso-cp__btn" type="button" onclick="volverAPasoCorreoCP()" style="margin-top:10px">Usar otro correo</button>
+    </div>
+
+    <p class="acceso-cp__msg" id="accesoCpMsg"></p>
+  </div>
+</div>
+
+<!-- ================= RIEL ================= -->
+<aside class="riel">
+  <div class="riel-m">
+    <!-- Sin liga a Inicio ni a ningún otro módulo: quien entra aquí por
+         código (correo externo) debe quedarse únicamente en Caso
+         Práctico — nada de navegación de salida de esta pantalla. -->
+    <div class="riel-placa">
+      <img src="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png"
+           alt="Financiera Cualli" onerror="this.style.display='none'">
+    </div>
+    <div class="riel-s"><span class="riel-s__marca"><svg class="rayo-marca rayo-marca--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L3 14L12 14L11 22L21 10L12 10Z"/></svg><b>Impulso Cualli</b></span>Caso Práctico · Mesa de Control</div>
+  </div>
+
+  <nav class="riel-n">
+    <div class="riel-e">Secciones</div>
+    <button class="nav-b" type="button" data-seccion="secDatos" onclick="irASeccion('secDatos')">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg>
+      Datos del candidato
+    </button>
+    <button class="nav-b" type="button" data-seccion="secHojaEjercicios" onclick="irASeccion('secHojaEjercicios')">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/><path d="M9 14h2M13 14h2M9 17h2M13 17h2"/></svg>
+      Ejercicios en hoja de cálculo
+    </button>
+    <button class="nav-b" type="button" data-seccion="secValidacion" onclick="irASeccion('secValidacion')">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+      Validación de documentación
+    </button>
+    <button class="nav-b" type="button" data-seccion="secEjercicioC" onclick="irASeccion('secEjercicioC')">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8l3 4v12H5V8l3-4z"/><path d="M9 12h6M9 16h6"/></svg>
+      Lectura de Documentos
+    </button>
+    <div id="rielInfo" style="padding:6px 18px;color:rgba(255,255,255,.55);font-size:12.5px;line-height:1.7"></div>
+  </nav>
+
+  <div class="riel-p">
+    <div class="riel-u">
+      <div class="avatar" id="avatar">—</div>
+      <div><div class="ru-n" id="ruNom">Sin nombre aún</div><div class="ru-r" id="ruRol"></div></div>
+    </div>
+    <div class="riel-v" id="vigencia">
+      <span class="foco ambar" id="foco"></span>
+      <span id="vigTxt">Sin enviar</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ================= OBRA ================= -->
+<div class="obra">
+  <div class="cinta">
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+    <span><b>Confidencial</b> Este caso usa documentos y cifras reales de un cliente de Financiera Cualli. Úsalo únicamente para este proceso de entrevista.</span>
+  </div>
+
+  <div class="progreso-cp" id="progresoCp">
+    <div class="progreso-cp__barra"><div class="progreso-cp__r" id="progresoCpR"></div></div>
+    <span class="progreso-cp__txt" id="progresoCpTxt">0% completado</span>
+  </div>
+
+  <main class="tela">
+    <section class="vista viva" id="vApp">
+      <div id="app" aria-live="polite" aria-atomic="false">
+
+        <header class="cabecera panel-cab">
+          <div class="cab-txt">
+            <div class="cab-ante"><span class="cab-rombo"></span>Proceso de contratación</div>
+            <h1>Caso Práctico<br>Ejecutivo de Mesa de Control</h1>
+            <span class="cab-hilo"></span>
+            <p>Este ejercicio reproduce tareas reales de Mesa de Control: revisar una programación de dispersiones,
+               validar documentación de crédito, calcular comisiones y leer actas societarias. No hay límite de
+               tiempo — tómate el que necesites y responde con el mismo criterio que usarías en el puesto.</p>
+          </div>
+          <div class="cab-der">
+            <div class="cab-fig cab-fig--pop">
+              <svg viewBox="0 0 180 180" fill="none">
+                <circle cx="90" cy="90" r="76" fill="#FFFBEF"/>
+                <circle cx="90" cy="90" r="76" stroke="#F7DC96" stroke-width="1.5" stroke-dasharray="4 8"/>
+                <rect x="52" y="48" width="76" height="92" rx="6" fill="#fff" stroke="#15171C" stroke-width="3"/>
+                <path d="M64 68h52M64 82h52M64 96h32" stroke="#4C525E" stroke-width="3.5" stroke-linecap="round"/>
+                <path d="M62 116l10 10 20-22" stroke="#FDB913" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+        </header>
+
+        <div class="resumen-banda">
+          <div class="resumen-item">
+            <span class="resumen-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>
+            <div class="resumen-texto"><b>4</b><span>Secciones a resolver</span></div>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+            <div class="resumen-texto"><b>Libre</b><span>Sin límite de tiempo</span></div>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></span>
+            <div class="resumen-texto"><b>Confidencial</b><span>Datos reales de un cliente</span></div>
+          </div>
+        </div>
+
+        <!-- ============ DATOS DEL CANDIDATO ============ -->
+        <div class="panel panel--sube2" id="secDatos">
+          <div class="panel-h">
+            <span class="panel-h__ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg></span>
+            <h2>Datos del candidato</h2>
+            <span class="panel-n">01 · 04</span>
+          </div>
+          <div class="panel-b">
+            <div class="fila-cp">
+              <div class="grupo-cp">
+                <label class="grupo-cp__etq" for="candNombre">Nombre completo</label>
+                <input class="campo-cp" type="text" id="candNombre" placeholder="Nombre y apellidos" autocomplete="off">
+              </div>
+              <div class="grupo-cp">
+                <label class="grupo-cp__etq" for="candPuesto">Puesto al que aplica</label>
+                <input class="campo-cp" type="text" id="candPuesto" value="Ejecutivo de Mesa de Control" readonly>
+              </div>
+              <div class="grupo-cp" style="grid-column:1 / -1">
+                <label class="grupo-cp__etq" for="candCorreo">Correo electrónico (verificado)</label>
+                <input class="campo-cp" type="email" id="candCorreo" readonly>
+                <p class="sub-cp__txt" style="margin-top:6px">Este es el correo con el que iniciaste sesión — a él te compartimos tu hoja de trabajo para los ejercicios de cálculo.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ EJERCICIOS EN HOJA DE CÁLCULO ============ -->
+        <div class="panel" id="secHojaEjercicios">
+          <div class="panel-h">
+            <span class="panel-h__ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/><path d="M9 14h2M13 14h2M9 17h2M13 17h2"/></svg></span>
+            <h2>Ejercicios en hoja de cálculo</h2>
+            <span class="panel-n">02 · 04</span>
+          </div>
+          <div class="panel-b">
+            <div class="nota-cp">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.4v.6"/></svg>
+              <div>
+                <b>Instrucciones</b>
+                <ol class="nota-cp__ol">
+                  <li>La revisión de una programación de dispersiones, el Ejercicio A y el Ejercicio B se resuelven en una
+                      hoja de cálculo de Google, no en este formulario.</li>
+                  <li>En cuanto captures tu nombre completo en "Datos del candidato" te generamos una copia personal con
+                      acceso de edición en tu correo ya verificado — ábrela con el botón de abajo.</li>
+                  <li>Usa fórmulas para tus cálculos. Puedes seguir con el resto del formulario mientras la resuelves.</li>
+                </ol>
+              </div>
+            </div>
+
+            <div class="hoja-cp-estado" id="hojaCpEstado" data-estado="pendiente">
+              <div class="hoja-cp-estado__ico">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/></svg>
+              </div>
+              <div class="hoja-cp-estado__txt">
+                <b id="hojaCpTitulo">Esperando tu correo</b>
+                <span id="hojaCpSub">Captúralo en "Datos del candidato" para generar tu hoja de trabajo.</span>
+              </div>
+              <a class="btn btn-pri" id="btnAbrirHoja" href="#" target="_blank" rel="noopener" style="display:none">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M8 7h9v9"/></svg>
+                Abrir mi hoja de trabajo
+              </a>
+              <button class="btn btn-borde" id="btnReintentarHoja" type="button" onclick="solicitarHojaEjercicios(true)" style="display:none">Reintentar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ VALIDACIÓN DE DOCUMENTACIÓN ============ -->
+        <div class="panel" id="secValidacion">
+          <div class="panel-h">
+            <span class="panel-h__ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>
+            <h2>Validación de documentación</h2>
+            <span class="panel-n">03 · 04</span>
+          </div>
+          <div class="panel-b">
+            <div class="grupo-cp">
+              <label class="grupo-cp__etq" for="v1">¿Qué puntos revisarías de un pagaré al recibirlo del área jurídica?</label>
+              <textarea class="campo-cp" id="v1" rows="3"></textarea>
+            </div>
+            <div class="grupo-cp">
+              <label class="grupo-cp__etq" for="v2">Dentro de un contrato de crédito, ¿cuáles son los puntos que revisarías?</label>
+              <textarea class="campo-cp" id="v2" rows="4"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ EJERCICIO C — LECTURA DE DOCUMENTOS ============ -->
+        <div class="panel" id="secEjercicioC">
+          <div class="panel-h">
+            <span class="panel-h__ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8l3 4v12H5V8l3-4z"/><path d="M9 12h6M9 16h6"/></svg></span>
+            <h2>Ejercicio C — Lectura de Documentos</h2>
+            <span class="panel-n">04 · 04</span>
+          </div>
+          <div class="panel-b">
+            <div class="nota-cp">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.4v.6"/></svg>
+              <div>
+                <b>Instrucciones</b>
+                <ol class="nota-cp__ol">
+                  <li>Lee primero las preguntas para identificar exactamente qué datos necesitas.</li>
+                  <li>Dirígete a los documentos (Acta Constitutiva y Acta de Asamblea). El objetivo es simular la revisión
+                      de un expediente real, por lo que no es necesario que leas cada documento de principio a fin;
+                      aplica la búsqueda ágil para localizar únicamente la información clave.</li>
+                  <li>Responde de forma clara en el espacio asignado para cada pregunta.</li>
+                </ol>
+              </div>
+            </div>
+
+            <a class="enlace-cp" href="https://drive.google.com/file/d/1huthfo57Wvoyn4snL3GUckxESqmrkkqd/view?usp=drive_link" target="_blank" rel="noopener">
+              <span class="enlace-cp__ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8l3 4v12H5V8l3-4z"/><path d="M9 12h6M9 16h6"/></svg></span>
+              <span><b>Acta Constitutiva</b><span>Ver documento en Drive ↗</span></span>
+            </a>
+            <a class="enlace-cp" href="https://drive.google.com/file/d/1mmueEjuOQqMXbSXkWy_7wbABhs64hICH/view?usp=drive_link" target="_blank" rel="noopener">
+              <span class="enlace-cp__ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8l3 4v12H5V8l3-4z"/><path d="M9 12h6M9 16h6"/></svg></span>
+              <span><b>Acta de Asamblea</b><span>Ver documento en Drive ↗</span></span>
+            </a>
+
+            <div class="bloque-cp-sep"></div>
+
+            <div class="grupo-cp">
+              <label class="grupo-cp__etq">1. Identificación de la empresa</label>
+              <p class="sub-cp__txt" style="margin-top:0">Nombre de la empresa, fecha de constitución.</p>
+              <textarea class="campo-cp" id="c1" rows="2"></textarea>
+            </div>
+
+            <div class="bloque-cp-sep"></div>
+            <label class="grupo-cp__etq">2. Capital social y administración al constituirse (según el acta constitutiva)</label>
+            <div class="sub-cp">
+              <span class="sub-cp__letra">a</span>
+              <div class="sub-cp__cont"><div class="sub-cp__txt">Nombre de los accionistas iniciales y porcentaje de acciones de cada uno.</div><textarea class="campo-cp" id="c2a" rows="2"></textarea></div>
+            </div>
+            <div class="sub-cp">
+              <span class="sub-cp__letra">b</span>
+              <div class="sub-cp__cont"><div class="sub-cp__txt">¿Quién quedó con la representación legal de la sociedad y con qué cargo?</div><textarea class="campo-cp" id="c2c" rows="2"></textarea></div>
+            </div>
+            <div class="sub-cp">
+              <span class="sub-cp__letra">c</span>
+              <div class="sub-cp__cont"><div class="sub-cp__txt">¿Qué facultades se le otorgaron (pleitos y cobranzas, actos de administración, actos de dominio)? ¿Son suficientes para firmar un contrato de crédito?</div><textarea class="campo-cp" id="c2d" rows="2"></textarea></div>
+            </div>
+
+            <div class="bloque-cp-sep"></div>
+            <label class="grupo-cp__etq">3. Capital social y administración actuales (según el acta de asamblea)</label>
+            <div class="sub-cp">
+              <span class="sub-cp__letra">a</span>
+              <div class="sub-cp__cont"><div class="sub-cp__txt">Nombre de los accionistas actuales y porcentaje de acciones de cada uno. ¿Hubo cambio de accionistas, cambio en el capital social, o ambos?</div><textarea class="campo-cp" id="c3a" rows="2"></textarea></div>
+            </div>
+            <div class="sub-cp">
+              <span class="sub-cp__letra">b</span>
+              <div class="sub-cp__cont"><div class="sub-cp__txt">¿Cambió la persona con la representación legal respecto a la constitutiva? ¿Quién la tiene ahora y con qué facultades?</div><textarea class="campo-cp" id="c3b" rows="2"></textarea></div>
+            </div>
+            <div class="bloque-cp-sep"></div>
+            <div class="grupo-cp">
+              <label class="grupo-cp__etq">4. Congruencia entre documentos</label>
+              <p class="sub-cp__txt" style="margin-top:0">¿La fecha del acta de asamblea es posterior a la de la constitutiva? ¿Hay algo en las fechas o en el contenido de ambos documentos que te haga dudar de que esta es la información vigente más reciente de la empresa?</p>
+              <textarea class="campo-cp" id="c4" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ BARRA DE ENVÍO ============ -->
+        <div class="panel" style="margin-top:18px">
+          <div class="barra-envio-cp">
+            <div>
+              <div class="barra-envio-cp__txt"><span id="txtPendientes"><b>25</b> campos sin responder</span></div>
+              <div class="barra-envio-cp__guardado"><span class="barra-envio-cp__punto"></span><span id="txtGuardado">Guardado localmente en este navegador</span></div>
+            </div>
+            <button class="btn btn-pri" id="btnEnviar" onclick="enviarCasoPractico()">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+              Enviar respuestas
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+</div>
+
+<?!= include('CasoPracticoJS'); ?>
+</body>
+</html>
