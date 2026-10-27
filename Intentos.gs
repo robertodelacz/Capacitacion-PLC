@@ -1,10 +1,4 @@
-/**
- * Intentos.gs
- * Determina si un colaborador puede presentar, ya está bloqueado (por
- * intentos agotados o por ya haber aprobado), o si la campaña no está
- * vigente. Todo el conteo vive en el servidor — nunca se confía en un
- * contador que pueda manipularse desde el navegador.
- */
+
 
 function obtenerEstadoUsuario(correo) {
   const config = obtenerConfig();
