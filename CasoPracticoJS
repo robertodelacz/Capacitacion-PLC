@@ -1,0 +1,486 @@
+<script>
+ 
+  const CAMPOS_TEXTO_CP = [
+    'v1','v2',
+    'c1','c2a','c2c','c2d','c3a','c3b','c4'
+  ];
+  const TODOS_LOS_CAMPOS_CP = CAMPOS_TEXTO_CP;
+  const CLAVE_LOCAL_CP = 'casoPracticoMC_v1';
+  const CLAVE_TOKEN_CP = 'casoPracticoMC_v1_token';
+  const CLAVE_TOKEN_CORREO_CP = 'casoPracticoMC_v1_token_correo';
+  const INTERVALO_RESPALDO_MS = 25000;
+
+  let huboCambiosSinRespaldarCP = false;
+  let envioExitosoCP = false;
+  let estadoHojaCP = { estado: 'pendiente', url: '', correo: '' };
+  let tokenSesionCP = '';
+  let correoSesionCP = '';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => document.getElementById('splash').classList.add('fuera'), 2650);
+    iniciarAccesoCP();
+  });
+
+  /
+  function claveLocalCP() {
+    return CLAVE_LOCAL_CP + (correoSesionCP ? (':' + correoSesionCP) : '');
+  }
+
+  function iniciarAccesoCP() {
+    let tokenGuardado = '', correoGuardado = '';
+    try {
+      tokenGuardado = sessionStorage.getItem(CLAVE_TOKEN_CP) || '';
+      correoGuardado = sessionStorage.getItem(CLAVE_TOKEN_CORREO_CP) || '';
+    } catch (e) { /* sessionStorage inaccesible — se cae al login normal */ }
+
+    if (tokenGuardado && correoGuardado) {
+      establecerSesionCP(tokenGuardado, correoGuardado);
+      return;
+    }
+
+    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+    google.script.run
+      .withSuccessHandler(resultado => {
+        if (resultado && resultado.token) {
+          establecerSesionCP(resultado.token, resultado.correo);
+        } else {
+          mostrarPasoCorreoCP(); // externo o sin sesión de Google — pide código
+        }
+      })
+      .withFailureHandler(error => {
+        mostrarPasoCorreoCP();
+        mostrarMensajeAccesoCP((error && error.message) || String(error), false);
+      })
+      .iniciarSesionAutomaticaCP();
+  }
+
+  function establecerSesionCP(token, correo) {
+    tokenSesionCP = token;
+    correoSesionCP = correo;
+    try {
+      sessionStorage.setItem(CLAVE_TOKEN_CP, token);
+      sessionStorage.setItem(CLAVE_TOKEN_CORREO_CP, correo);
+    } catch (e) { /* no crítico — solo significa que un refresh pedirá login de nuevo */ }
+
+    const acceso = document.getElementById('accesoCp');
+    if (acceso) acceso.classList.add('fuera');
+
+    const elCorreo = document.getElementById('candCorreo');
+    if (elCorreo) elCorreo.value = correo;
+
+    continuarDespuesDeAccesoCP();
+  }
+
+  /** Limpia la sesión guardada y regresa a la pantalla de login — usado cuando una llamada protegida detecta que el token ya no sirve. */
+  function cerrarSesionCP(mensaje) {
+    tokenSesionCP = '';
+    try {
+      sessionStorage.removeItem(CLAVE_TOKEN_CP);
+      sessionStorage.removeItem(CLAVE_TOKEN_CORREO_CP);
+    } catch (e) {}
+    const acceso = document.getElementById('accesoCp');
+    if (acceso) acceso.classList.remove('fuera');
+    mostrarPasoCorreoCP();
+    if (mensaje) mostrarMensajeAccesoCP(mensaje, false);
+  }
+
+  /** true (y ya resuelto con un regreso al login) si el error parece ser de sesión/acceso, no del dato que se intentaba guardar. */
+  function manejarPosibleErrorSesionCP(error) {
+    const m = ((error && error.message) || String(error) || '').toLowerCase();
+    const esDeSesion = m.includes('sesión') || m.includes('sesion') || m.includes('acceso');
+    if (esDeSesion) cerrarSesionCP('Tu sesión ya no es válida — vuelve a iniciar sesión.');
+    return esDeSesion;
+  }
+
+  function mostrarPasoCorreoCP() {
+    document.getElementById('accesoCpPasoCorreo').style.display = '';
+    document.getElementById('accesoCpPasoCodigo').style.display = 'none';
+  }
+
+  function mostrarPasoCodigoCP() {
+    document.getElementById('accesoCpPasoCorreo').style.display = 'none';
+    document.getElementById('accesoCpPasoCodigo').style.display = '';
+    const elCodigo = document.getElementById('accesoCodigo');
+    if (elCodigo) { elCodigo.value = ''; elCodigo.focus(); }
+  }
+
+  function mostrarMensajeAccesoCP(mensaje, ok) {
+    const el = document.getElementById('accesoCpMsg');
+    if (!el) return;
+    el.textContent = mensaje || '';
+    el.classList.toggle('ok', !!ok);
+  }
+
+  function pedirCodigoAccesoCP() {
+    const correo = (document.getElementById('accesoCorreo').value || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+      mostrarMensajeAccesoCP('Escribe un correo con formato válido.', false);
+      return;
+    }
+    const btn = document.getElementById('btnPedirCodigo');
+    btn.disabled = true;
+    mostrarMensajeAccesoCP('Enviando…', true);
+
+    google.script.run
+      .withSuccessHandler(() => {
+        btn.disabled = false;
+        mostrarPasoCodigoCP();
+        mostrarMensajeAccesoCP('Si tu correo está autorizado, te enviamos un código — revisa tu bandeja (y spam).', true);
+      })
+      .withFailureHandler(error => {
+        btn.disabled = false;
+        mostrarMensajeAccesoCP((error && error.message) || String(error), false);
+      })
+      .solicitarCodigoAccesoCP(correo);
+  }
+
+  function verificarCodigoAccesoClienteCP() {
+    const correo = (document.getElementById('accesoCorreo').value || '').trim();
+    const codigo = (document.getElementById('accesoCodigo').value || '').trim();
+    if (!codigo) {
+      mostrarMensajeAccesoCP('Captura el código de 6 dígitos.', false);
+      return;
+    }
+    const btn = document.getElementById('btnVerificarCodigo');
+    btn.disabled = true;
+    mostrarMensajeAccesoCP('Verificando…', true);
+
+    google.script.run
+      .withSuccessHandler(resultado => {
+        btn.disabled = false;
+        establecerSesionCP(resultado.token, resultado.correo);
+      })
+      .withFailureHandler(error => {
+        btn.disabled = false;
+        mostrarMensajeAccesoCP((error && error.message) || String(error), false);
+      })
+      .verificarCodigoAccesoCP(correo, codigo);
+  }
+
+  function volverAPasoCorreoCP() {
+    mostrarPasoCorreoCP();
+    mostrarMensajeAccesoCP('', false);
+  }
+
+  // ================= RESTO DE LA APP (solo tras login) =================
+  function continuarDespuesDeAccesoCP() {
+    restaurarBorrador();
+    actualizarIdentidadDesdeCampos();
+    actualizarContadorPendientes();
+    activarResaltadoDeSeccion();
+    iniciarRespaldoPeriodicoCP();
+    reanudarEstadoHoja();
+
+    ['candNombre', 'candPuesto'].concat(TODOS_LOS_CAMPOS_CP).forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => {
+        guardarBorrador();
+        huboCambiosSinRespaldarCP = true;
+        actualizarContadorPendientes();
+        if (id === 'candNombre' || id === 'candPuesto') actualizarIdentidadDesdeCampos();
+      });
+    });
+
+    // Avisa antes de cerrar o navegar fuera si hay algo que todavía no
+    // llegó al servidor — un cierre accidental de pestaña es justo el caso
+    // que el respaldo periódico no alcanza a cubrir en el momento exacto.
+    window.addEventListener('beforeunload', e => {
+      if (envioExitosoCP) return;
+      const nombre = (document.getElementById('candNombre').value || '').trim();
+      if (!nombre) return; // ni siquiera empezó — nada que perder
+      e.preventDefault();
+      e.returnValue = '';
+    });
+  }
+
+  function irASeccion(id) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ================= SECCIÓN ACTIVA EN EL RIEL =================
+  // Resalta en el menú lateral qué sección del formulario se está viendo,
+  // igual que el examen PLD marca su vista actual con la clase .viva.
+  function activarResaltadoDeSeccion() {
+    const botones = Array.from(document.querySelectorAll('.nav-b[data-seccion]'));
+    if (!botones.length || !('IntersectionObserver' in window)) return;
+
+    const marcar = id => {
+      botones.forEach(b => b.classList.toggle('viva', b.dataset.seccion === id));
+    };
+
+    const observador = new IntersectionObserver(entradas => {
+      const visible = entradas.filter(e => e.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) marcar(visible.target.id);
+    }, { rootMargin: '-15% 0px -65% 0px', threshold: [0, .25, .5, .75, 1] });
+
+    botones.forEach(b => {
+      const seccion = document.getElementById(b.dataset.seccion);
+      if (seccion) observador.observe(seccion);
+    });
+  }
+
+  function iniciales(nombre) {
+    if (!nombre) return '—';
+    const partes = nombre.trim().split(/\s+/);
+    return ((partes[0] || '')[0] || '') + ((partes[1] || '')[0] || '');
+  }
+
+  function actualizarIdentidadDesdeCampos() {
+    const nombre = (document.getElementById('candNombre').value || '').trim();
+    const puesto = (document.getElementById('candPuesto').value || '').trim();
+    document.getElementById('avatar').textContent = iniciales(nombre);
+    document.getElementById('ruNom').textContent = nombre || 'Sin nombre aún';
+    document.getElementById('ruRol').textContent = puesto || '';
+  }
+
+  function recolectarRespuestas() {
+    const datos = {};
+    TODOS_LOS_CAMPOS_CP.forEach(id => {
+      const el = document.getElementById(id);
+      datos[id] = el ? el.value.trim() : '';
+    });
+    return datos;
+  }
+
+  function contarPendientes(respuestas) {
+    return TODOS_LOS_CAMPOS_CP.reduce((n, id) => n + (respuestas[id] ? 0 : 1), 0);
+  }
+
+  function actualizarContadorPendientes() {
+    const pendientes = contarPendientes(recolectarRespuestas());
+    const el = document.getElementById('txtPendientes');
+    if (el) {
+      el.innerHTML = pendientes === 0
+        ? '<b>Todos los campos respondidos</b>'
+        : `<b>${pendientes}</b> campo${pendientes === 1 ? '' : 's'} sin responder`;
+    }
+
+    // Barra de avance superior — puramente visual, el mismo conteo que ya
+    // se usaba para el texto de "pendientes", nada más se refleja también
+    // como porcentaje de la barra.
+    const total = TODOS_LOS_CAMPOS_CP.length;
+    const pct = total ? Math.round(((total - pendientes) / total) * 100) : 0;
+    const barra = document.getElementById('progresoCpR');
+    const txtPct = document.getElementById('progresoCpTxt');
+    if (barra) barra.style.width = pct + '%';
+    if (txtPct) txtPct.textContent = pct + '% completado';
+  }
+
+  // ================= RESPALDO EN SERVIDOR =================
+  // El borrador local (abajo) protege recargas/cierres accidentales de ESTA
+  // pestaña. Esto protege el escenario más grave: que el navegador, la
+  // laptop o el internet fallen a medio caso y no haya forma de volver a
+  // ese mismo navegador. Cada ~25s, si hubo cambios, se manda una copia
+  // cruda (sin calificar) a la hoja "CasoPractico_Borradores", identificada
+  // por el correo ya autenticado — nunca crea filas de más, siempre
+  // sobrescribe la misma. Si el envío final se completa, esa fila se
+  // borra sola (ver registrarCasoPractico en el .gs).
+  function iniciarRespaldoPeriodicoCP() {
+    setInterval(() => {
+      if (!huboCambiosSinRespaldarCP || envioExitosoCP) return;
+      respaldarEnServidorCP();
+    }, INTERVALO_RESPALDO_MS);
+  }
+
+  function respaldarEnServidorCP() {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+    const nombre = (document.getElementById('candNombre').value || '').trim();
+    const puesto = (document.getElementById('candPuesto').value || '').trim();
+    if (!nombre) return; // sin nombre todavía no hay nada que valga la pena respaldar en el servidor
+
+    huboCambiosSinRespaldarCP = false;
+    google.script.run
+      .withSuccessHandler(marcarRespaldoServidorOkCP)
+      .withFailureHandler(error => {
+        huboCambiosSinRespaldarCP = true; // reintenta en el siguiente ciclo
+        manejarPosibleErrorSesionCP(error);
+      })
+      .guardarBorradorCasoPractico({ nombre, puesto, hojaUrl: estadoHojaCP.url }, recolectarRespuestas(), tokenSesionCP);
+  }
+
+  function marcarRespaldoServidorOkCP() {
+    const t = document.getElementById('txtGuardado');
+    if (t) t.textContent = 'Respaldado en servidor · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ================= BORRADOR LOCAL =================
+  // Conveniencia por navegador, no es la fuente de verdad: si la pestaña se
+  // cierra o recarga a medio caso, las respuestas no se pierden. Nunca se
+  // comparte entre dispositivos ni llega a Claude — solo vive en este
+  // navegador hasta que se envía con éxito. Se guarda por correo
+  // autenticado (ver claveLocalCP) para no mezclar el borrador de dos
+  // candidatos distintos en la misma computadora.
+  function guardarBorrador() {
+    try {
+      const datos = recolectarRespuestas();
+      datos.candNombre = document.getElementById('candNombre').value;
+      datos.candPuesto = document.getElementById('candPuesto').value;
+      datos.hojaCpEstado = estadoHojaCP;
+      localStorage.setItem(claveLocalCP(), JSON.stringify(datos));
+      const t = document.getElementById('txtGuardado');
+      if (t) t.textContent = 'Guardado localmente · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) { /* localStorage puede fallar (ventana privada, etc.) — no es crítico */ }
+  }
+
+  function restaurarBorrador() {
+    try {
+      const crudo = localStorage.getItem(claveLocalCP());
+      if (!crudo) return;
+      const datos = JSON.parse(crudo);
+      ['candNombre', 'candPuesto'].concat(TODOS_LOS_CAMPOS_CP).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && datos[id] !== undefined) el.value = datos[id];
+      });
+      if (datos.hojaCpEstado && typeof datos.hojaCpEstado === 'object') {
+        estadoHojaCP = datos.hojaCpEstado;
+      }
+    } catch (e) { /* borrador corrupto o inaccesible — se empieza en blanco */ }
+  }
+
+  // ================= HOJA DE EJERCICIOS (Sheets) =================
+  // Dispersiones + Ejercicio A + Ejercicio B viven en un Google Sheet que se
+  // genera y comparte solo (crearHojaEjerciciosCP, en el .gs) en cuanto hay
+  // sesión y nombre. Es idempotente del lado del servidor (mismo correo
+  // autenticado reutiliza la hoja ya creada), así que aquí solo nos toca no
+  // pedirla de más y reflejar el estado con claridad.
+  function pintarEstadoHoja(estado, datos) {
+    const cont = document.getElementById('hojaCpEstado');
+    if (!cont) return;
+    const titulo = document.getElementById('hojaCpTitulo');
+    const sub = document.getElementById('hojaCpSub');
+    const btnAbrir = document.getElementById('btnAbrirHoja');
+    const btnReintentar = document.getElementById('btnReintentarHoja');
+
+    cont.dataset.estado = estado;
+    btnAbrir.style.display = 'none';
+    btnReintentar.style.display = 'none';
+
+    if (estado === 'creando') {
+      titulo.textContent = 'Preparando tu hoja de trabajo…';
+      sub.textContent = 'Esto toma solo unos segundos.';
+    } else if (estado === 'lista') {
+      titulo.textContent = 'Tu hoja de trabajo está lista';
+      sub.textContent = 'Se compartió a ' + ((datos && datos.correo) || 'tu correo') + ' con permiso de edición.';
+      btnAbrir.href = (datos && datos.url) || '#';
+      btnAbrir.style.display = 'inline-flex';
+    } else if (estado === 'error') {
+      titulo.textContent = 'No se pudo generar tu hoja';
+      sub.textContent = (datos && datos.mensaje) || 'Intenta de nuevo en unos segundos.';
+      btnReintentar.style.display = 'inline-flex';
+    } else {
+      titulo.textContent = 'Preparando tu hoja de trabajo…';
+      sub.textContent = 'Esto toma solo unos segundos.';
+    }
+  }
+
+  // Al cargar/recargar la página, siempre se reconfirma con el servidor en
+  // vez de confiar ciegamente en lo que quedó guardado en este navegador.
+  // Así, si Roberto borra la fila/liga del candidato en la hoja de
+  // "CasoPractico_Borradores" (su forma de "reiniciar" a alguien), la
+  // próxima vez que se abra el formulario el servidor ya no encuentra nada
+  // que reutilizar y genera una hoja nueva solita.
+  function reanudarEstadoHoja() {
+    solicitarHojaEjercicios(true);
+  }
+
+  function solicitarHojaEjercicios(forzado) {
+    const nombre = (document.getElementById('candNombre').value || '').trim();
+
+    if (!nombre) {
+      pintarEstadoHoja('error', { mensaje: 'Captura también tu nombre completo — lo usamos para nombrar tu carpeta de trabajo.' });
+      return;
+    }
+    if (!forzado && estadoHojaCP.estado === 'lista' && estadoHojaCP.correo === correoSesionCP) {
+      return; // ya está lista para este mismo correo — nada que hacer
+    }
+
+    estadoHojaCP = { estado: 'creando', url: '', correo: correoSesionCP };
+    pintarEstadoHoja('creando');
+
+    google.script.run
+      .withSuccessHandler(resultado => {
+        estadoHojaCP = { estado: 'lista', url: resultado.url, correo: correoSesionCP };
+        pintarEstadoHoja('lista', { url: resultado.url, correo: correoSesionCP });
+        guardarBorrador();
+        huboCambiosSinRespaldarCP = true;
+      })
+      .withFailureHandler(error => {
+        if (manejarPosibleErrorSesionCP(error)) return;
+        estadoHojaCP = { estado: 'error', url: '', correo: correoSesionCP };
+        pintarEstadoHoja('error', { mensaje: (error && error.message) || String(error) });
+      })
+      .crearHojaEjerciciosCP(nombre, tokenSesionCP);
+  }
+
+  // ================= TOAST (aviso no bloqueante) =================
+  function mostrarToast(mensaje) {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.4v.6"/></svg><span>${mensaje}</span>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4200);
+  }
+
+  // ================= ENVÍO =================
+  function enviarCasoPractico() {
+    const nombre = document.getElementById('candNombre').value.trim();
+    const puesto = document.getElementById('candPuesto').value.trim();
+    if (!nombre || !puesto) {
+      mostrarToast('Captura tu nombre completo antes de enviar.');
+      irASeccion('secDatos');
+      return;
+    }
+
+    if (estadoHojaCP.estado !== 'lista') {
+      const seguir = confirm('Tu hoja de ejercicios en Sheets todavía no está lista. ¿Enviar de todas formas?');
+      if (!seguir) { irASeccion('secHojaEjercicios'); return; }
+    }
+
+    const respuestas = recolectarRespuestas();
+    const pendientes = contarPendientes(respuestas);
+    if (pendientes > 0 && !confirm(`Hay ${pendientes} campo(s) sin responder. ¿Enviar de todas formas?`)) {
+      return;
+    }
+
+    const btn = document.getElementById('btnEnviar');
+    btn.disabled = true;
+    btn.innerHTML = 'Enviando…';
+
+    google.script.run
+      .withSuccessHandler(alEnviarConExito)
+      .withFailureHandler(alFallarEnvio)
+      .registrarCasoPractico({ nombre, puesto }, respuestas, tokenSesionCP);
+  }
+
+  function alFallarEnvio(error) {
+    const btn = document.getElementById('btnEnviar');
+    btn.disabled = false;
+    btn.innerHTML = 'Enviar respuestas';
+    if (manejarPosibleErrorSesionCP(error)) return;
+    mostrarToast('No se pudo enviar: ' + ((error && error.message) || String(error)) + '. Tus respuestas siguen guardadas en este navegador — intenta de nuevo.');
+  }
+
+  function alEnviarConExito(resultado) {
+    envioExitosoCP = true;
+    huboCambiosSinRespaldarCP = false;
+    try {
+      localStorage.removeItem(claveLocalCP());
+      sessionStorage.removeItem(CLAVE_TOKEN_CP);
+      sessionStorage.removeItem(CLAVE_TOKEN_CORREO_CP);
+    } catch (e) {}
+    document.getElementById('foco').className = 'foco verde';
+    document.getElementById('vigTxt').textContent = 'Enviado';
+    document.getElementById('app').innerHTML = `
+      <div class="vacio">
+        <svg class="vacio-i" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <div class="vacio-t">Respuestas enviadas, gracias</div>
+        <p class="vacio-p">Tus respuestas al Caso Práctico ya quedaron registradas. El equipo de Contraloría las revisará
+           como parte de este proceso de contratación.${resultado && resultado.folio ? ` Folio: <strong>${resultado.folio}</strong>` : ''}</p>
+      </div>`;
+  }
+</script>
