@@ -22,7 +22,7 @@
            alt="Financiera Cualli" onerror="this.style.display='none'">
     </div>
     <div class="sp-regla"></div>
-    <div class="sp-sis">Capacitación PLD-FT</div>
+    <div class="sp-sis">CualliMind</div>
     <div class="sp-bien">
       <div class="sp-hola">Bienvenido</div>
       <div class="sp-nom" id="spNom"></div>
@@ -38,14 +38,20 @@
 <!-- ================= RIEL ================= -->
 <aside class="riel">
   <div class="riel-m">
-    <div class="riel-placa">
-      <img src="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png"
-           alt="Financiera Cualli" onerror="this.style.display='none'">
-    </div>
-    <div class="riel-s"><b>Capacitación PLD-FT</b>Financiera Cualli</div>
+    <a href="<?= ScriptApp.getService().getUrl() ?>?pagina=inicio" style="text-decoration:none;display:block">
+      <div class="riel-placa">
+        <img src="https://cualli.mx/wp-content/uploads/2022/07/cualli-bl@3x.png"
+             alt="Financiera Cualli" onerror="this.style.display='none'">
+      </div>
+    </a>
+    <div class="riel-s"><b>CualliMind</b>Capacitación PLD-FT</div>
   </div>
 
   <nav class="riel-n">
+    <a class="nav-b" href="<?= ScriptApp.getService().getUrl() ?>?pagina=inicio" style="text-decoration:none">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/></svg>
+      Volver al inicio
+    </a>
     <div class="riel-e">Examen</div>
     <div id="rielInfo" style="padding:6px 18px;color:rgba(255,255,255,.55);font-size:12.5px;line-height:1.7"></div>
   </nav>
