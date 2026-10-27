@@ -1,15 +1,5 @@
 <style>
-/* ==========================================================================
-   LPB · Terminal de Cumplimiento · Financiera Cualli
-   --------------------------------------------------------------------------
-   PALETA: gris y amarillo #FDB913 dominantes. Negro y blanco como contraste.
-   Sin azules — #364494 es de Hipoo, no de Cualli. Rojos y verdes solo como
-   señal semántica de bloqueo o eliminación de la lista.
-
-   LENGUAJE VISUAL: superficies flotantes de esquinas redondeadas sobre un
-   plano gris, con sombras de tres capas muy difusas. La profundidad separa
-   niveles de información; no es decoración.
-   ========================================================================== */
+/
 
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -639,5 +629,276 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--oro-h);outline-offs
   .panel-h{flex-wrap:wrap;gap:8px 14px}
   .panel-n{margin-left:0}
   .reloj-ex{margin-left:0;width:100%;order:3;text-align:center;font-size:17px;padding:9px 14px}
+}
+
+/* ==========================================================================
+   Añadido para Caso Práctico (no existe en el examen PLD): formulario largo
+   de una sola pantalla en vez de pregunta por pregunta — tabla de datos
+   real, bloques de pregunta abierta y barra de envío fija. Mismos tokens
+   de color y radio que el resto del sistema.
+   ========================================================================== */
+
+/* Campo de texto / número genérico del formulario. */
+.campo-cp{width:100%;font-family:inherit;font-size:14px;color:var(--g900);
+  border:1.5px solid var(--g200);border-radius:var(--r-s);padding:12px 14px;
+  background:var(--blanco);transition:border-color .18s,box-shadow .18s}
+.campo-cp:focus{outline:0;border-color:var(--oro-h);box-shadow:0 0 0 3px rgba(253,185,19,.18)}
+.campo-cp::placeholder{color:var(--g400)}
+textarea.campo-cp{resize:vertical;min-height:72px;line-height:1.55}
+.campo-cp.num{font-family:'IBM Plex Mono',monospace;font-weight:600}
+.campo-cp.guardado{border-color:var(--verde-b)}
+
+.grupo-cp{margin-bottom:18px}
+.grupo-cp:last-child{margin-bottom:0}
+.grupo-cp__etq{display:block;font-size:12px;font-weight:700;color:var(--g700);margin-bottom:8px;
+  letter-spacing:.01em}
+.grupo-cp__etq .op{font-weight:500;color:var(--g400);text-transform:none;letter-spacing:0}
+
+/* Subpregunta con letra (a, b, c…) — ficha pequeña a la izquierda del campo. */
+.sub-cp{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px}
+.sub-cp:last-child{margin-bottom:0}
+.sub-cp__letra{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--oro-n);
+  border:1px solid var(--oro-b);color:var(--oro-o);font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin-top:2px}
+.sub-cp__cont{flex:1;min-width:0}
+.sub-cp__txt{font-size:14px;color:var(--g800);line-height:1.55;margin-bottom:10px}
+
+/* Datos del candidato: dos campos lado a lado, misma jerarquía que
+   "Confirma tus datos" del examen PLD pero editable. */
+.fila-cp{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:620px){.fila-cp{grid-template-columns:1fr}}
+
+/* Tabla de dispersiones — datos reales, por eso tabla semántica y no el
+   grid de tarjetas .cuadro (siete columnas no caben en tarjetas). */
+.tabla-cp-wrap{overflow-x:auto;border-radius:var(--r-m);border:1px solid var(--g150);margin-bottom:4px}
+.tabla-cp{width:100%;border-collapse:collapse;font-size:12.5px;min-width:780px}
+.tabla-cp th{background:var(--g900);color:#fff;font-weight:600;font-size:9.5px;
+  letter-spacing:.09em;text-transform:uppercase;text-align:left;padding:12px 14px;white-space:nowrap}
+.tabla-cp td{padding:11px 14px;border-bottom:1px solid var(--g150);background:var(--blanco);
+  white-space:nowrap;color:var(--g800)}
+.tabla-cp tbody tr:last-child td{border-bottom:0}
+.tabla-cp tbody tr:nth-child(even) td{background:var(--g50)}
+.tabla-cp td.mono{font-family:'IBM Plex Mono',monospace}
+.tabla-cp td.restriccion-si{color:var(--rojo);font-weight:600}
+
+.bloque-cp-sep{height:1px;background:var(--g150);margin:26px 0}
+
+/* Ejercicios de cálculo: enunciado en tarjeta ámbar, igual tratamiento que
+   el reloj del examen PLD — el único acento de color en la pantalla. */
+.enunciado-cp{background:var(--oro-n);border:1px solid var(--oro-b);border-radius:var(--r-m);
+  padding:20px 22px;margin-bottom:22px;font-size:14px;color:var(--g800);line-height:1.65}
+.enunciado-cp b{color:var(--g900)}
+.enunciado-cp ul{margin:10px 0 0;padding-left:20px}
+.enunciado-cp li{margin-bottom:4px}
+
+.rejilla-cp{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+
+/* Enlaces a las actas — ficha clicable, no un link azul suelto (no hay
+   azules en la paleta Cualli). */
+.enlace-cp{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1.5px solid var(--g200);
+  border-radius:var(--r-m);text-decoration:none;color:var(--g900);background:var(--blanco);
+  transition:border-color .18s,background .18s;margin-bottom:10px}
+.enlace-cp:hover{border-color:var(--oro);background:var(--oro-n)}
+.enlace-cp__ico{width:20px;height:20px;padding:10px;border-radius:12px;background:var(--oro-n);
+  border:1px solid var(--oro-b);box-sizing:content-box;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center}
+.enlace-cp__ico svg{width:20px;height:20px;stroke:var(--oro-o);fill:none;stroke-width:2}
+.enlace-cp b{font-size:14px;font-weight:600;display:block}
+.enlace-cp span{font-size:11.5px;color:var(--g500);font-family:'IBM Plex Mono',monospace;
+  letter-spacing:.04em}
+
+/* Barra de envío fija al fondo — siempre visible mientras se desplaza un
+   formulario largo, con el contador de pendientes como único recordatorio,
+   nunca como bloqueo. */
+.barra-envio-cp{position:sticky;bottom:0;left:0;margin:28px -1px -1px;padding:20px 28px;
+  background:var(--g900);display:flex;align-items:center;justify-content:space-between;
+  gap:18px;flex-wrap:wrap;border-radius:0 0 var(--r-l) var(--r-l);z-index:30}
+.barra-envio-cp__txt{font-size:12.5px;color:rgba(255,255,255,.6)}
+.barra-envio-cp__txt b{color:#fff;font-weight:700}
+.barra-envio-cp__guardado{display:inline-flex;align-items:center;gap:7px;font-size:11px;
+  color:rgba(255,255,255,.4);font-family:'IBM Plex Mono',monospace;letter-spacing:.06em;
+  text-transform:uppercase;margin-top:4px}
+.barra-envio-cp__punto{width:6px;height:6px;border-radius:50%;background:var(--oro);flex-shrink:0}
+
+@media (max-width:760px){
+  .barra-envio-cp{position:static;border-radius:var(--r-l)}
+  .rejilla-cp{grid-template-columns:1fr}
+}
+
+/* ==========================================================================
+   Añadido para Caso Práctico — v2: secciones más marcadas y notas legibles.
+   .panel-n ya existía en el sistema (numeración a la derecha del panel-h) —
+   solo se usa aquí por primera vez, con "01 · 06" etc. para las 6 secciones.
+   .nota-cp reemplaza .campo-ayuda dentro de este módulo: mismo rol (texto de
+   apoyo), pero del tamaño del resto del formulario y con el mismo trato de
+   tarjeta con acento que ya usa .cinta arriba, en vez de texto gris diminuto.
+   .campo-cp[readonly] es de uso general (cualquier campo fijo del sistema).
+   ========================================================================== */
+
+.campo-cp[readonly]{background:var(--g50);color:var(--g600);cursor:default}
+.campo-cp[readonly]:focus{box-shadow:none;border-color:var(--g200)}
+
+.nota-cp{display:flex;gap:12px;align-items:flex-start;background:var(--g50);
+  border:1px solid var(--g150);border-left:3px solid var(--oro);border-radius:var(--r-m);
+  padding:15px 20px;margin:0 0 22px;font-size:14.5px;color:var(--g700);line-height:1.7}
+.nota-cp svg{flex-shrink:0;width:18px;height:18px;margin-top:1px;stroke:var(--oro-h);
+  fill:none;stroke-width:2}
+.nota-cp b{color:var(--g900);font-weight:700;letter-spacing:.1em;font-size:10.5px;
+  text-transform:uppercase;display:block;margin-bottom:4px}
+
+.sub-cp__txt{font-size:14.5px}
+
+@media (max-width:620px){
+  .nota-cp{padding:14px 16px;font-size:14px}
+}
+
+/* ==========================================================================
+   Añadido para Impulso Cualli — marca de rayo. Ícono de marca (nunca un
+   botón ni un control) que acompaña el nombre de la plataforma en sus tres
+   apariciones canónicas: el splash, el riel lateral y el encabezado de
+   inicio. A propósito sólido y dorado, no de trazo — así se distingue del
+   lenguaje de íconos de línea que usa el resto del sistema (navegación,
+   paneles) y se lee como isotipo, no como un control más de la interfaz.
+   ========================================================================== */
+.rayo-marca{display:inline-block;flex-shrink:0;fill:var(--oro);
+  filter:drop-shadow(0 0 6px rgba(253,185,19,.5))}
+.rayo-marca--sm{width:13px;height:13px}
+.rayo-marca--md{width:15px;height:15px}
+.rayo-marca--lg{width:27px;height:27px}
+
+.sp-sis{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.sp-sis span{text-indent:.3em}
+
+.riel-s__marca{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.riel-s__marca b{margin-bottom:0}
+
+/* Sub-bloques con etiqueta (Contexto / Objetivo / Acción requerida) dentro
+   de una .nota-cp — reutiliza el mismo <b> de eyebrow ("Instrucciones") para
+   cada etiqueta, así que no hace falta CSS nuevo para los textos en sí. */
+.nota-cp__sec{margin-top:12px}
+
+/* ==========================================================================
+   Añadido para Caso Práctico — v3: resaltado de fila en la tabla de
+   dispersiones. Con 7 columnas y varias casi idénticas entre sí (monto de
+   correo vs. programado, CLABE de correo vs. programado), es fácil perder
+   el renglón al cruzar la vista de un lado a otro — el resaltado ayuda a
+   seguirlo. A propósito NO se resalta ninguna columna ni celda en automático
+   según si coincide o no: encontrar las discrepancias es el ejercicio, y
+   hacerlo por él le quitaría el sentido al caso práctico.
+   ========================================================================== */
+.tabla-cp td{transition:background-color .12s ease}
+.tabla-cp tbody tr:hover td{background:var(--oro-n)}
+.tabla-cp tbody tr:hover td:first-child{color:var(--oro-o);font-weight:700}
+
+/* ==========================================================================
+   Añadido para Impulso Cualli (pantalla de inicio de la plataforma): las
+   tarjetas de curso reutilizan .inicio-lista / .inicio-it tal cual ya
+   existían — solo se vuelven enlaces, así que resetean el estilo de
+   link del navegador sin tocar nada del componente original.
+   ========================================================================== */
+a.inicio-it{text-decoration:none;color:inherit;cursor:pointer}
+.inicio-it.pronto{cursor:default;opacity:.55}
+.inicio-it.pronto:hover{background:var(--blanco)}
+.etiqueta-pronto{display:inline-block;margin-top:8px;font-size:9px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--g500);
+  background:var(--g100);border:1px solid var(--g200);border-radius:999px;padding:3px 10px}
+
+/* ==========================================================================
+   Añadido para Caso Práctico — v4: embellecimiento visual sin tocar la
+   lógica. Ícono de cada sección en una ficha (mismo lenguaje que
+   .resumen-ico/.ficha-ico/.enlace-cp__ico, usado aquí por primera vez
+   dentro de .panel-h — la regla genérica ".panel-h svg" sigue intacta para
+   el resto del sistema). Barra de avance real ligada al número de campos
+   respondidos. Datos clave de los ejercicios de cálculo como fichas en vez
+   de solo texto corrido. Agrupación de columnas "Correo / Programado" en
+   la tabla de dispersiones — solo cambia cómo se lee, nunca resalta cuál
+   columna coincide con cuál.
+   ========================================================================== */
+
+.panel-h__ico{display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  width:17px;height:17px;padding:9px;border-radius:12px;box-sizing:content-box;
+  background:var(--oro-n);border:1px solid var(--oro-b)}
+.panel-h__ico svg{width:17px;height:17px;stroke:var(--oro-o);fill:none;stroke-width:2.1}
+
+.progreso-cp{position:sticky;top:0;left:0;z-index:25;background:var(--blanco);
+  border-bottom:1px solid var(--g150);padding:12px 40px;display:flex;align-items:center;
+  gap:16px;box-shadow:0 1px 2px rgba(21,23,28,.04)}
+.progreso-cp__barra{flex:1;height:6px;background:var(--g150);border-radius:99px;overflow:hidden}
+.progreso-cp__r{height:100%;background:var(--oro);border-radius:99px;
+  transition:width .3s cubic-bezier(.2,.7,.3,1);width:0%}
+.progreso-cp__txt{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;
+  letter-spacing:.06em;color:var(--g500);white-space:nowrap;flex-shrink:0}
+
+.datos-clave-cp{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 2px}
+.dato-clave-cp{background:var(--blanco);border:1px solid var(--oro-b);border-radius:var(--r-s);
+  padding:10px 16px;display:flex;flex-direction:column;gap:3px}
+.dato-clave-cp span{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--oro-o)}
+.dato-clave-cp b{font-family:'IBM Plex Mono',monospace;font-size:14.5px;color:var(--g900);font-weight:700}
+
+.tabla-cp th[rowspan]{vertical-align:middle}
+.tabla-cp th.agrupa{text-align:center}
+.tabla-cp th.agrupa + th.agrupa{border-left:1px solid rgba(255,255,255,.16)}
+.tabla-cp th.sub{font-weight:500;color:rgba(255,255,255,.72)}
+.tabla-cp thead tr:nth-child(2) th:nth-child(3){border-left:1px solid rgba(255,255,255,.16)}
+
+@media (max-width:760px){
+  .progreso-cp{padding:10px 24px}
+  .progreso-cp__txt{font-size:10px}
+}
+@media (max-width:620px){
+  .progreso-cp{padding:9px 16px;gap:10px}
+}
+
+/* Lista numerada dentro de una .nota-cp (p. ej. instrucciones del Ejercicio
+   C en 3 pasos) — hereda tipografía y color de .nota-cp, solo añade la
+   numeración con el mismo tono dorado que el resto de acentos del módulo. */
+.nota-cp__ol{margin:2px 0 0;padding-left:19px}
+.nota-cp__ol li{margin-bottom:6px}
+.nota-cp__ol li::marker{color:var(--oro-o);font-weight:700}
+.nota-cp__ol li:last-child{margin-bottom:0}
+
+/* Tarjeta de estado para el ejercicio que vive en Sheets — mismo lenguaje
+   visual de tarjeta con sombra que el resto del Caso Práctico, con un
+   ícono que cambia de color/ícono según data-estado (pendiente/creando/
+   lista/error) en vez de 4 variantes de HTML distintas. */
+.hoja-cp-estado{display:flex;align-items:center;gap:16px;background:var(--blanco);
+  border:1px solid var(--g150);border-radius:var(--r-m);padding:18px 20px;box-shadow:var(--s1);
+  flex-wrap:wrap}
+.hoja-cp-estado__ico{width:40px;height:40px;border-radius:var(--r-s);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;background:var(--g100);color:var(--g500)}
+.hoja-cp-estado__ico svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
+.hoja-cp-estado__txt{flex:1;min-width:180px}
+.hoja-cp-estado__txt b{display:block;font-size:14px;color:var(--g900);margin-bottom:2px}
+.hoja-cp-estado__txt span{font-size:13px;color:var(--g500);line-height:1.5}
+.hoja-cp-estado[data-estado="creando"] .hoja-cp-estado__ico{background:var(--oro-n);color:var(--oro-o);
+  animation:gira 1.1s linear infinite}
+.hoja-cp-estado[data-estado="lista"] .hoja-cp-estado__ico{background:var(--verde-f);color:var(--verde)}
+.hoja-cp-estado[data-estado="error"] .hoja-cp-estado__ico{background:var(--rojo-f);color:var(--rojo)}
+@media (max-width:620px){
+  .hoja-cp-estado{padding:15px 16px}
+  .hoja-cp-estado .btn{width:100%}
+}
+
+/* Pantalla de acceso (login) del Caso Práctico — mismo lenguaje visual que
+   #splash (overlay de pantalla completa, fondo oscuro) pero con una
+   tarjeta blanca encima en vez de la placa de bienvenida: aquí hay que
+   leer y escribir, no solo esperar una animación. Se oculta con .fuera en
+   cuanto hay sesión válida (ver establecerSesionCP). */
+.acceso-cp{position:fixed;inset:0;z-index:500;background:var(--g900);
+  display:flex;align-items:center;justify-content:center;padding:24px}
+.acceso-cp.fuera{display:none}
+.acceso-cp__card{background:var(--blanco);border-radius:var(--r-l);box-shadow:var(--s3);
+  padding:38px 34px;max-width:380px;width:100%;text-align:center}
+.acceso-cp__marca{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;
+  letter-spacing:.22em;text-transform:uppercase;text-indent:.1em;color:var(--g500);margin-bottom:20px}
+.acceso-cp__t{font-size:18px;font-weight:600;letter-spacing:-.01em;color:var(--g900);margin-bottom:10px}
+.acceso-cp__sub{font-size:12.5px;color:var(--g500);line-height:1.6;margin-bottom:24px}
+.acceso-cp .grupo-cp{text-align:left}
+.acceso-cp__btn{width:100%;justify-content:center}
+.acceso-cp__msg{font-size:12px;margin-top:14px;min-height:16px;color:var(--rojo)}
+.acceso-cp__msg.ok{color:var(--verde)}
+@media (max-width:560px){
+  .acceso-cp__card{padding:28px 22px}
 }
 </style>
