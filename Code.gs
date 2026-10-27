@@ -6,10 +6,34 @@
  * a la vez.
  */
 
-function doGet() {
-  return HtmlService.createTemplateFromFile('Interfaz')
+function doGet(e) {
+  const pagina = e && e.parameter && e.parameter.pagina;
+
+  // Impulso Cualli es la plataforma de aprendizaje de Contraloría — este
+  // doGet reparte entre su pantalla de inicio y cada curso/módulo según
+  // ?pagina=. Confirmado que la campaña PLD-FT sigue en pruebas (ningún
+  // colaborador real depende todavía del link base), así que el link de
+  // siempre ahora abre el inicio de la plataforma en vez de saltar
+  // directo al examen — cuando quieras compartir un módulo específico,
+  // usa su ?pagina= de una vez.
+  if (pagina === 'casopractico') {
+    return HtmlService.createTemplateFromFile('CasoPracticoInterfaz')
+      .evaluate()
+      .setTitle('Impulso Cualli · Caso Práctico')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
+  if (pagina === 'pld') {
+    return HtmlService.createTemplateFromFile('Interfaz')
+      .evaluate()
+      .setTitle('Impulso Cualli · Capacitación PLD-FT')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
+  // Por defecto (sin ?pagina=, o ?pagina=inicio): pantalla principal.
+  return HtmlService.createTemplateFromFile('Inicio')
     .evaluate()
-    .setTitle('Capacitación PLD-FT · Financiera Cualli')
+    .setTitle('Impulso Cualli · Financiera Cualli')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
