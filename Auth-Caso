@@ -1,0 +1,265 @@
+
+
+
+const SHEET_USUARIOS_CP = 'CasoPractico_Usuarios';
+const ENCABEZADOS_USUARIOS_CP = ['Correo', 'Nombre (referencia)'];
+
+const SHEET_ACCESOS_CP = 'CasoPractico_Accesos';
+const ENCABEZADOS_ACCESOS_CP = ['Fecha', 'Correo', 'Método'];
+
+const DOMINIO_INTERNO_CP = 'cualli.mx';
+const DURACION_SESION_CP_MS = 12 * 60 * 60 * 1000;   
+const DURACION_CODIGO_CP_SEG = 10 * 60;             
+const MAX_CODIGOS_POR_HORA_CP = 3;                 
+const MAX_INTENTOS_CODIGO_CP = 3;                   
+
+
+function configurarAccesoInicialCP() {
+  const hoja = _asegurarHojaUsuariosCP();
+  const miCorreo = _normalizarCorreoCP(Session.getEffectiveUser().getEmail());
+
+  if (!miCorreo) {
+    Logger.log('No se pudo detectar tu correo al ejecutar esto desde el editor. Agrégalo a mano: fila nueva en "CasoPractico_Usuarios", columna A.');
+    return;
+  }
+  if (_correoAutorizadoCP(miCorreo)) {
+    Logger.log('Tu correo (' + miCorreo + ') ya estaba en la lista de autorizados — no se agregó de más.');
+    return;
+  }
+  hoja.appendRow([miCorreo, 'Roberto (tú)']);
+  Logger.log('Listo: se agregó ' + miCorreo + ' a "CasoPractico_Usuarios". Ya puedes volver a cargar el Caso Práctico.');
+}
+
+function _asegurarHojaUsuariosCP() {
+  const libro = SpreadsheetApp.getActive();
+  let hoja = libro.getSheetByName(SHEET_USUARIOS_CP);
+  if (!hoja) {
+    hoja = libro.insertSheet(SHEET_USUARIOS_CP);
+    hoja.appendRow(ENCABEZADOS_USUARIOS_CP);
+    hoja.getRange(1, 1, 1, ENCABEZADOS_USUARIOS_CP.length).setFontWeight('bold');
+    hoja.setFrozenRows(1);
+    hoja.setColumnWidth(1, 260);
+    hoja.setColumnWidth(2, 220);
+  }
+  return hoja;
+}
+
+function _asegurarHojaAccesosCP() {
+  const libro = SpreadsheetApp.getActive();
+  let hoja = libro.getSheetByName(SHEET_ACCESOS_CP);
+  if (!hoja) {
+    hoja = libro.insertSheet(SHEET_ACCESOS_CP);
+    hoja.appendRow(ENCABEZADOS_ACCESOS_CP);
+    hoja.getRange(1, 1, 1, ENCABEZADOS_ACCESOS_CP.length).setFontWeight('bold');
+    hoja.setFrozenRows(1);
+  }
+  return hoja;
+}
+
+function _normalizarCorreoCP(correo) {
+  return String(correo || '').trim().toLowerCase();
+}
+
+/** true si el correo (ya normalizado) está en "CasoPractico_Usuarios". Es la única lista blanca — nada de roles. */
+function _correoAutorizadoCP(correo) {
+  const hoja = _asegurarHojaUsuariosCP();
+  const ultimaFila = hoja.getLastRow();
+  if (ultimaFila < 2) return false;
+  const correos = hoja.getRange(2, 1, ultimaFila - 1, 1).getValues();
+  const buscado = _normalizarCorreoCP(correo);
+  return correos.some(fila => _normalizarCorreoCP(fila[0]) === buscado);
+}
+
+function _registrarAccesoCP(correo, metodo) {
+  try {
+    _asegurarHojaAccesosCP().appendRow([new Date(), correo, metodo]);
+  } catch (e) { /* no crítico — un fallo aquí no debe tronar el login */ }
+}
+
+// ================= LLAVE Y TOKEN =================
+// Token = base64web(payload JSON) + "." + firma HMAC. Nada de librerías
+// externas: todo con Utilities/PropertiesService nativos.
+
+function _llaveHmacCP() {
+  const props = PropertiesService.getScriptProperties();
+  let llave = props.getProperty('LLAVE_HMAC_SESION_CP');
+  if (!llave) {
+    // Se genera una sola vez, la primera vez que hace falta, y se guarda.
+    // Borrar esta propiedad invalida TODAS las sesiones activas de golpe.
+    llave = Utilities.getUuid() + Utilities.getUuid();
+    props.setProperty('LLAVE_HMAC_SESION_CP', llave);
+  }
+  return llave;
+}
+
+function _firmarCP(payloadB64) {
+  return Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(payloadB64, _llaveHmacCP())
+  );
+}
+
+/** Compara dos cadenas byte a byte sin salir antes de tiempo — evita que el tiempo de respuesta delate en qué posición falló. */
+function _igualesTiempoConstanteCP(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function _emitirTokenCP(correo) {
+  const payload = { correo: _normalizarCorreoCP(correo), exp: Date.now() + DURACION_SESION_CP_MS };
+  const payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify(payload));
+  return payloadB64 + '.' + _firmarCP(payloadB64);
+}
+
+/**
+ * Decodifica y valida un token de principio a fin: firma, expiración, y
+ * (esto es lo que hace que una baja aplique de inmediato) que el correo
+ * SIGA estando en la lista blanca justo ahora — no solo cuando se emitió
+ * el token. Lanza si algo no cuadra; nunca regresa un payload a medias.
+ */
+function _validarTokenCP(token) {
+  token = String(token || '');
+  const idx = token.lastIndexOf('.');
+  if (idx === -1) throw new Error('Sesión inválida — vuelve a iniciar sesión.');
+
+  const payloadB64 = token.substring(0, idx);
+  const firma = token.substring(idx + 1);
+  if (!_igualesTiempoConstanteCP(firma, _firmarCP(payloadB64))) {
+    throw new Error('Sesión inválida — vuelve a iniciar sesión.');
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(payloadB64)).getDataAsString());
+  } catch (e) {
+    throw new Error('Sesión inválida — vuelve a iniciar sesión.');
+  }
+  if (!payload || !payload.correo || !payload.exp) {
+    throw new Error('Sesión inválida — vuelve a iniciar sesión.');
+  }
+  if (Date.now() > payload.exp) {
+    throw new Error('Tu sesión expiró — vuelve a iniciar sesión.');
+  }
+  if (!_correoAutorizadoCP(payload.correo)) {
+    throw new Error('Ya no tienes acceso a este Caso Práctico — contacta a Roberto.');
+  }
+  return payload; // { correo, exp }
+}
+
+/**
+ * Puerta de entrada obligatoria: TODA función del Caso Práctico expuesta a
+ * google.script.run empieza con "const usuario = _requerirSesionCP(token);"
+ * y usa usuario.correo — nunca un correo que haya mandado el cliente por
+ * su cuenta.
+ */
+function _requerirSesionCP(token) {
+  return _validarTokenCP(token);
+}
+
+// ================= CÓDIGO DE 6 DÍGITOS =================
+// Generado con Utilities.getUuid() + un hash — no con Math.random().
+
+function _generarCodigoCP() {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    Utilities.getUuid() + ':' + new Date().getTime()
+  );
+  let n = 0;
+  for (let i = 0; i < 4; i++) n = (n * 256 + (bytes[i] & 0xff)) >>> 0;
+  return String(n % 1000000).padStart(6, '0');
+}
+
+// ================= LOGIN =================
+
+/**
+ * Camino 1. Se llama siempre al cargar la página. Si quien abre el link
+ * es de tu dominio Y ya tiene sesión de Google activa en el navegador,
+ * Session.getActiveUser().getEmail() devuelve su correo solo — sin pedir
+ * nada. Si no aplica (correo vacío o de otro dominio), regresa null y el
+ * cliente cae al camino 2 (pedir código).
+ */
+function iniciarSesionAutomaticaCP() {
+  const correo = _normalizarCorreoCP(Session.getActiveUser().getEmail());
+  if (!correo || !correo.endsWith('@' + DOMINIO_INTERNO_CP)) return null;
+  if (!_correoAutorizadoCP(correo)) {
+    throw new Error('Tu correo (' + correo + ') no está en la lista de autorizados para este Caso Práctico.');
+  }
+  _registrarAccesoCP(correo, 'Automático');
+  return { token: _emitirTokenCP(correo), correo };
+}
+
+/**
+ * Camino 2, paso 1. SIEMPRE responde lo mismo exista o no el correo en la
+ * lista blanca — así nadie puede usar esto para "tantear" qué correos
+ * tienen acceso. Límite de 5 códigos por hora por correo.
+ */
+function solicitarCodigoAccesoCP(correo) {
+  correo = _normalizarCorreoCP(correo);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+    throw new Error('Escribe un correo con formato válido.');
+  }
+
+  const cache = CacheService.getScriptCache();
+  const claveLimite = 'cp_limite_' + correo;
+  const intentosHora = Number(cache.get(claveLimite) || '0');
+  if (intentosHora >= MAX_CODIGOS_POR_HORA_CP) {
+    throw new Error('Pediste demasiados códigos en la última hora — espera un poco e intenta de nuevo.');
+  }
+  cache.put(claveLimite, String(intentosHora + 1), 3600);
+
+  if (_correoAutorizadoCP(correo)) {
+    const codigo = _generarCodigoCP();
+    cache.put('cp_codigo_' + correo, JSON.stringify({ codigo, intentos: 0 }), DURACION_CODIGO_CP_SEG);
+    try {
+      MailApp.sendEmail({
+        to: correo,
+        subject: 'Tu código de acceso — Caso Práctico Impulso Cualli',
+        htmlBody:
+          '<p>Tu código de acceso al Caso Práctico es:</p>' +
+          '<p style="font-size:30px;font-weight:bold;letter-spacing:6px">' + codigo + '</p>' +
+          '<p>Vence en 10 minutos. Si tú no lo pediste, puedes ignorar este correo.</p>'
+      });
+    } catch (e) {
+      // Fallo de envío (p. ej. cuota diaria de MailApp agotada). No se le
+      // avisa al candidato — el mensaje de respuesta es siempre el mismo —
+      // pero tampoco queda registro aquí; si un candidato se queja de no
+      // recibir el código, revisa el registro de ejecuciones de Apps Script.
+    }
+  }
+
+  return { ok: true }; // mismo resultado, exista o no el correo en la lista
+}
+
+/** Camino 2, paso 2. Un solo uso: el código se borra de la caché en cuanto se usa, acierte o no. */
+function verificarCodigoAccesoCP(correo, codigo) {
+  correo = _normalizarCorreoCP(correo);
+  codigo = String(codigo || '').trim();
+
+  const cache = CacheService.getScriptCache();
+  const clave = 'cp_codigo_' + correo;
+  const crudo = cache.get(clave);
+  if (!crudo) throw new Error('Tu código expiró o no existe — pide uno nuevo.');
+
+  const datos = JSON.parse(crudo);
+  if (datos.intentos >= MAX_INTENTOS_CODIGO_CP) {
+    cache.remove(clave);
+    throw new Error('Agotaste los intentos para este código — pide uno nuevo.');
+  }
+
+  if (!_igualesTiempoConstanteCP(codigo, datos.codigo)) {
+    datos.intentos += 1;
+    cache.put(clave, JSON.stringify(datos), DURACION_CODIGO_CP_SEG);
+    throw new Error('Código incorrecto — te quedan ' + (MAX_INTENTOS_CODIGO_CP - datos.intentos) + ' intento(s).');
+  }
+
+  cache.remove(clave); // un solo uso, acertado o no se vuelve a usar
+
+  if (!_correoAutorizadoCP(correo)) {
+    throw new Error('Tu correo no está autorizado para este Caso Práctico.');
+  }
+
+  _registrarAccesoCP(correo, 'Código');
+  return { token: _emitirTokenCP(correo), correo };
+}
